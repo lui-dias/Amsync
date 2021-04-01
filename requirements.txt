@@ -1,0 +1,6 @@
+aiohttp
+aiofiles
+ujson
+pybase64
+peewee
+python-dotenv
