@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from os import environ
 from asyncio import (
-    get_event_loop,
+    new_event_loop,
     run_coroutine_threadsafe,
     iscoroutinefunction,
     wait_for,
@@ -43,7 +43,6 @@ class Bot:
 
         self._prefix = prefix
         self._msg = Message()
-        self._loop = get_event_loop()
         self.id = None
 
         if only_chats and ignore_chats:
@@ -101,7 +100,8 @@ class Bot:
         return foo
 
     def run(self) -> None:
-        self._ws = Ws(self._email, self._password, self.only_chats, self.ignore_chats)
+        self._loop = new_event_loop()
+        self._ws = Ws(self._email, self._password, self._loop, self.only_chats, self.ignore_chats)
 
         Thread(target=self._loop.run_forever).start()
         fut = run_coroutine_threadsafe(
@@ -112,8 +112,14 @@ class Bot:
         # so it is necessary to take the exception and raise it
         try:
             fut.result()
+            self._loop.stop()
+
         except:
-            raise fut.exception() # type: ignore
+            raise fut.exception()
+
+    def restart(self):
+        self._ws.close()
+        self.run()
 
     async def send(
         self,
