@@ -120,7 +120,7 @@ class Message:
         self.nickname: str | None = exist(_cm['author'], 'nickname')
         self.text:     str | None = exist(_cm, 'content')
         self.type:     str | None = exist(_cm, 'type', in_str=False)
-        self.uid:      str | None = exist(_cm['author'], 'uid')
+        self.uid:      str | None = exist(_cm, 'uid')
 
     
         return self
