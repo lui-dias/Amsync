@@ -32,4 +32,4 @@ async def hello(m: Message):
 
 bot.run()
 ```
-**[Incredible documentation to create beautiful bots](docs/docs.md)**
+**[Incredible documentation to create beautiful bots](https://github.com/ellandor/Amsync/blob/main/docs/docs.md)**
