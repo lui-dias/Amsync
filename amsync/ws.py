@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from re import search
-from enum import Enum
 from typing import Any, Callable, AsyncIterator, Coroutine
-from asyncio import TimeoutError
+from asyncio import get_event_loop
 from contextlib import suppress
 
 from ujson import dumps, loads
@@ -14,28 +13,22 @@ from . import obj  # type: ignore
 from .db import DB  # type: ignore
 from .obj import Message, req  # type: ignore
 
-
 Coro_return_None = Callable[[], Coroutine[None, None, None]]
 Coro_return_Message = Callable[[], Coroutine[Message, None, None]]
 Coro_return_Any = Callable[[], Coroutine[Any, None, None]]
 
-class State(Enum):
-    connection_closed = None
-    stop_ws = None
 
 class Ws:
     def __init__(
-        self, email: str, password: str, loop, only_chats={}, ignore_chats={}
+        self, email: str, password: str, only_chats={}, ignore_chats={}
     ):
         self._deviceid = obj.headers['NDCDEVICEID']
         self._email = email
         self._password = password
         self._account = DB()
-        self._loop = loop
+        self._loop = get_event_loop()
         self._only_chats = only_chats
         self._ignore_chats = ignore_chats
-        self._need_close = False
-        self._msg = Message()
         self.futures = []
 
     async def _get_sid(self) -> str:
@@ -57,17 +50,14 @@ class Ws:
                 self._loop.create_task(i())
 
             while True:
-                if self._need_close:
-                    break
                 if ws.closed:
                     for i in self._events['close']:
                         self._loop.create_task(i())
-                    yield State.connection_closed
-                with suppress(TypeError, TimeoutError):
-                    res = await ws.receive_json(loads=loads, timeout=.01)
+                    yield False
+                with suppress(TypeError):
+                    res = await ws.receive_json(loads=loads)
                     if res['t'] == 1000:
-                        yield self._msg.from_ws(res['o'])
-        yield State.stop_ws
+                        yield Message().from_ws(res['o'])
 
     def _can_call(self, msg: Message):
         if not self._only_chats and not self._ignore_chats:
@@ -88,9 +78,6 @@ class Ws:
                 and msg.com != community
             ):
                 return True
-
-    def close(self):
-        self._need_close = True
 
     async def run(
         self,
@@ -116,16 +103,12 @@ class Ws:
         ).group(0)
         bot.id = id_
         obj.bot_id = id_
+
         self._events = events
-        self._need_close = False
 
         async for m in self._connect():
-            if m == State.stop_ws:
-                break
-
-            if m == State.connection_closed:
+            if not m:
                 return await self.run(call, events, bot)
-
             if self._can_call(m):
                 with suppress(KeyError):
                     for i in {
