@@ -122,7 +122,7 @@ else:
 If the song length is exceeded
 * Send a message saying that the song needs to be less than 3 minutes
 
-Senão
+Else
 * Download the music
 * Send the song
 * Delete the song (save space)
