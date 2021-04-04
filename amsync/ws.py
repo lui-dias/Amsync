@@ -62,7 +62,7 @@ class Ws:
     def _can_call(self, msg: Message):
         if not self._only_chats and not self._ignore_chats:
             return True
-            
+
         for community in self._only_chats:
             if (
                 msg.chat in self._only_chats[community]

@@ -5,7 +5,7 @@ with open('README.md', 'r') as stream:
 
 setup(
     name='Amsync',
-    version='0.0.3',
+    version='0.0.4',
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',
@@ -22,7 +22,7 @@ setup(
         'python',
         'python3',
         'python3.x',
-        'amino-async'
+        'amino-async',
     ],
     install_requires=[
         'aiohttp',
@@ -38,7 +38,7 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
         'Operating System :: OS Independent',
-        'Programming Language :: Python :: 3.8'
+        'Programming Language :: Python :: 3.8',
     ],
-    packages=find_packages()
+    packages=find_packages(),
 )
