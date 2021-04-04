@@ -3,6 +3,7 @@ from __future__ import annotations
 from asyncio import gather
 from typing import Any, Callable, NoReturn, Dict
 from pathlib import Path
+from unicodedata import normalize
 
 from aiohttp import request
 from ujson import dumps, loads
@@ -28,6 +29,10 @@ def exist(d: Req_json, k: str, *, in_str: bool = True):
         return str(d[k]) if in_str else d[k]
     except KeyError:
         return None
+
+
+def fix_ascii(s):
+    return normalize('NFKD', s).encode('ASCII', 'ignore').decode().strip()
 
 
 def on_limit(obj: list[Any], limit: int) -> bool:
@@ -391,9 +396,16 @@ class Chat:
 
         com = actual_com or com
         chat = actual_chat or chat
-        msgs = ([msgs] if not isinstance(msgs, (tuple, list)) else msgs) if msgs else [
-            msg.id for msg in await self.messages(check=check, com=com, chat=chat, start=start, end=end)
-        ]
+        msgs = (
+            ([msgs] if not isinstance(msgs, (tuple, list)) else msgs)
+            if msgs
+            else [
+                msg.id
+                for msg in await self.messages(
+                    check=check, com=com, chat=chat, start=start, end=end
+                )
+            ]
+        )
 
         async def foo(msg):
             return await req(
@@ -420,13 +432,25 @@ class Chat:
                 'get',
                 f'x{com}/s/chat/thread/{chat}/member?start={i}&size=100&type=default&cv=1.2',
             )
-            return [i for i in [User(i) for i in res['memberList'] if res['memberList']] if check(i)]
+            return [
+                i
+                for i in [
+                    User(i) for i in res['memberList'] if res['memberList']
+                ]
+                if check(i)
+            ]
 
-        members_count = (await req('get', f'x{com}/s/chat/thread/{chat}'))['thread']['membersCount']
+        members_count = (await req('get', f'x{com}/s/chat/thread/{chat}'))[
+            'thread'
+        ]['membersCount']
         MAX_MEMBERS_COUNT_IN_CHAT = 1000
         return (
             await gather(
-                *[foo(i) for i in range(0, MAX_MEMBERS_COUNT_IN_CHAT, 100) if i <= members_count]
+                *[
+                    foo(i)
+                    for i in range(0, MAX_MEMBERS_COUNT_IN_CHAT, 100)
+                    if i <= members_count
+                ]
             )
         )[0][start:end]
 
@@ -451,3 +475,101 @@ class Chat:
             )
 
         return await gather(*[foo(i) for i in chat])
+
+
+class Community:
+    async def chats(self, com=None, need_print=False, ignore_ascii=False):
+        if not actual_com and not com:
+            raise Exception('Enter a com or send a message in a chat')
+
+        com = com or actual_com
+        com = [com] if not isinstance(com, (list, tuple)) else com
+
+        async def foo(i):
+            res = await req(
+                'get', f'x{i}/s/chat/thread?type=public-all&start=0&size=100'
+            )
+            return {str(i): [Chat(i) for i in res['threadList']]}
+
+        a = await gather(*[foo(i) for i in com])
+        chats = {k: v for i in a for k, v in i.items()}
+
+        if need_print:
+            for i, e in chats.items():
+                max_name = len(
+                    max(
+                        [
+                            i.name if not ignore_ascii else fix_ascii(i.name)
+                            for i in e
+                        ],
+                        key=len,
+                    )
+                )
+                print(i)
+                for n in e:
+                    name = n.name if not ignore_ascii else fix_ascii(n.name)
+                    a = max_name - len(name)
+                    print(f"    {name} {' '*a}-> {n.id}")
+                print()
+        return chats
+
+
+class My:
+    async def chats(self, need_print=True, ignore_ascii=False):
+        res = await req('get', 'g/s/community/joined?v=1&start=0&size=50')
+        coms = {str(i['ndcId']): [i['name'], []] for i in res['communityList']}
+
+        async def foo(i):
+            return await req(
+                'get', f'x{i}/s/chat/thread?type=joined-me&start=0&size=100'
+            )
+
+        chats = await gather(*[foo(i) for i in coms])
+
+        for i in chats:
+            for j in i['threadList']:
+                com_id = str(j['ndcId'])
+                chat_id = j['threadId']
+                is_private_chat = j['membersQuota'] == 2
+                chat_name = (
+                    j['membersSummary'][1]['nickname']
+                    if is_private_chat
+                    else j['title']
+                )
+
+                coms[com_id][1].append(
+                    (
+                        chat_name if not ignore_ascii else fix_ascii(chat_name),
+                        chat_id,
+                    )
+                )
+
+        if need_print:
+            for i, e in coms.items():
+                max_name = (
+                    len(max([i[0] for i in e[1]], key=len)) if e[1] else 0
+                )
+                print(f'{coms[i][0]} - {i}')
+                for j in coms[i][1]:
+                    a = (max_name - len(j[0])) + 1
+                    print(f'    {j[0]} {" "*a}-> {j[1]}')
+                print()
+
+        return coms
+
+    async def communities(self, need_print=True, ignore_ascii=False):
+        res = await req('get', f'g/s/community/joined?v=1&start=0&size=50')
+        coms = {
+            i['name']
+            if not ignore_ascii
+            else fix_ascii(i['name']): str(i['ndcId'])
+            for i in res['communityList']
+        }
+
+        if need_print:
+            max_name = len(max(coms.keys(), key=len))
+            for i, e in coms.items():
+                a = max_name - len(i)
+                print(f'{i} {" "*a} -> {e}')
+
+        return coms
