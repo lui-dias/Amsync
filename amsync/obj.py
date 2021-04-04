@@ -67,10 +67,8 @@ async def req(
         API + url,
         data=dumps(data) if need_dumps else data,
         headers=headers,
+        raise_for_status=True,
     ) as _req:
-
-        if not _req.ok:
-            return _req.status
         return await get_return(_req)
 
 
