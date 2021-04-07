@@ -94,7 +94,7 @@ class Ws:
         # Sometimes sid can be an invalid base64, causing a padding error in urlsafe_b64decode
         # Adding == at the end of sid solves the problem
         tmp = self._account.get(self._email)
-        sid = tmp if len(tmp) == 192 else f'{tmp}=='
+        sid = tmp + '=' * (192 - len(tmp))
 
         obj.headers['NDCAUTH'] = f'sid={sid}'
         id_ = search(
