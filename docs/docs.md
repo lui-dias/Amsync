@@ -77,7 +77,7 @@ Insert the **event type** in the **function name**
 \
 Here we create the event **[ready](#event-ready)**, which is called when the bot starts.
 \
-**ready** não possui parâmetros
+**ready** has no parameters
 ```py
 async def ready():
 ```
