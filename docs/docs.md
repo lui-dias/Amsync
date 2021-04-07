@@ -20,6 +20,9 @@
     * [User.search](#user.search)
     * [User.ban](#user.ban)
     * [User.unban](#user.unban)
+    * [My.chats](#my.chats)
+    * [My.communities](#my.communities)
+    * [Community.chats](#community.chats)
 
 <br>
 <br>
@@ -442,6 +445,8 @@ await chat.messages(check=check, start=0, end=100)
 **OBS: `start`** and **`end`** work like a python list, **0** is the **most recent message**, **-1** is the **most old**
 <br>
 <br>
+<br>
+
 ## **Chat.clear**
 Clears chat messages
 ```py
@@ -479,6 +484,7 @@ await chat.clear(['message id', 'message id', 'message id'])
 ```
 <br>
 <br>
+<br>
 
 ## **Chat.members**
 Get chat members
@@ -504,6 +510,7 @@ But **`check`** receives **`User`** instead of **`Message`** and **it doesn’t 
 <br>
 <br>
 <br>
+
 ## **Chat.join**
 Enter a chat
 ```py
@@ -533,6 +540,7 @@ And specify the community
 ```py
 await chat.join('chat_id', 'com_id')
 ```
+<br>
 <br>
 <br>
 
@@ -599,6 +607,7 @@ await user.search(['uid', 'uid', 'uid'])
 ```
 <br>
 <br>
+<br>
 
 ## **User.ban**
 Ban a person
@@ -636,6 +645,7 @@ await bot.send(f'{nickname} banido')
 ```
 <br>
 <br>
+<br>
 
 ## **User.unban**
 ```py
@@ -648,5 +658,92 @@ async def unban(m: Message):
         await user.unban(uid)
         await bot.send(f'{nickname} desbanido')
 ```
-\
 Everything said in **[User.ban](#user.ban)** applies here
+<br>
+<br>
+<br>
+
+## **My.chats**
+Shows all chats that you are from all communities
+
+```py
+from amsync import Bot, My
+
+bot = Bot()
+
+@bot.on()
+async def ready():
+    await My.chats(need_print=True, ignore_ascii=True)
+
+bot.run()
+```
+<br>
+<br>
+
+**`need_print=True`** print beautifully
+```
+◌᮫۪۪ ⊹Orfanato Little Sunshine's✦ ◦۪˚ -> 4b2cfe86-f16b-45fd-a3fa-7578a60d034f
+𝒥𝒶𝓃𝓉𝒶𝓇 𝒹ℯ 𝒩𝒶𝓉𝒶𝓁 🎅 🎄🍗                  -> 8ab4a197-892e-4cd3-a84b-77631f3776cb
+(˳░ # mansão. ░۪ᤲ)                    -> 20b36d1b-853e-4dcb-b656-032d30dc960e
+𝒥𝒶𝓃𝓉𝒶𝓇 𝒹ℯ 𝒩𝒶𝓉𝒶𝓁 🎅 🎄🍗                  -> 799ac83b-66a5-48f6-98ec-64a7b40d4399
+𓍯 Divulgação 🌐𓂅                       -> a4573947-372c-478d-8c3d-65b9b2426150
+.....Xndjsh                           -> 9815bbe8-cece-438d-883f-14fc04b13620
+𓂃 曉 ִֶָLost Park 🍃ⸯ                   -> 7500b838-e50c-4a07-8d9c-a72eef145d06
+🍦 ✕ Praia Clube︕                      -> bfb23db2-c75b-4955-8d3a-e319b02ebf56
+```
+<br>
+<br>
+<br>
+
+**`ignore-ascii=True`** align the ids
+```
+Orfanato Little Sunshine's -> 4b2cfe86-f16b-45fd-a3fa-7578a60d034f
+Jantar de Natal            -> 8ab4a197-892e-4cd3-a84b-77631f3776cb
+( # mansao. )              -> 20b36d1b-853e-4dcb-b656-032d30dc960e
+Jantar de Natal            -> 799ac83b-66a5-48f6-98ec-64a7b40d4399
+Divulgacao                 -> a4573947-372c-478d-8c3d-65b9b2426150
+.....Xndjsh                -> 9815bbe8-cece-438d-883f-14fc04b13620
+Lost Park                  -> 7500b838-e50c-4a07-8d9c-a72eef145d06
+Praia Clube!               -> bfb23db2-c75b-4955-8d3a-e319b02ebf56
+```
+<br>
+<br>
+
+## **My.communities**
+Show your communities
+
+```py
+from amsync import Bot, My
+
+bot = Bot()
+
+@bot.on()
+async def ready():
+    await My.communities(need_print=True, ignore_ascii=True)
+
+bot.run()
+```
+Everything said in [My.chats](#My.chats) applies here
+<br>
+<br>
+<br>
+
+## **Community.chats**
+Shows all public chats in a community
+```py
+from amsync import Bot, Community
+from amsync.obj import Message
+
+bot = Bot()
+
+@bot.on()
+async def ready():
+    print('Ready')
+
+@bot.on()
+async def message(m: Message):
+    await Community.chats(need_print=True, ignore_ascii=True)
+
+bot.run()
+```
+Everything said in [My.chats](#My.chats) applies here

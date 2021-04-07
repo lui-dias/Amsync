@@ -478,7 +478,8 @@ class Chat:
 
 
 class Community:
-    async def chats(self, com=None, need_print=False, ignore_ascii=False):
+    @staticmethod
+    async def chats(com=None, need_print=False, ignore_ascii=False):
         if not actual_com and not com:
             raise Exception('Enter a com or send a message in a chat')
 
@@ -515,7 +516,8 @@ class Community:
 
 
 class My:
-    async def chats(self, need_print=True, ignore_ascii=False):
+    @staticmethod
+    async def chats(need_print=True, ignore_ascii=False):
         res = await req('get', 'g/s/community/joined?v=1&start=0&size=50')
         coms = {str(i['ndcId']): [i['name'], []] for i in res['communityList']}
 
@@ -557,7 +559,8 @@ class My:
 
         return coms
 
-    async def communities(self, need_print=True, ignore_ascii=False):
+    @staticmethod
+    async def communities(need_print=True, ignore_ascii=False):
         res = await req('get', f'g/s/community/joined?v=1&start=0&size=50')
         coms = {
             i['name']
