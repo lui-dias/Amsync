@@ -4,6 +4,7 @@ from asyncio import gather
 from typing import Any, Callable, NoReturn, Dict
 from pathlib import Path
 from unicodedata import normalize
+from imghdr import what
 
 from aiohttp import request
 from ujson import dumps, loads
@@ -185,7 +186,7 @@ class Message:
 
         com = actual_com or com
         chat = actual_chat or chat
-        files = [files] if isinstance(files, str) else files
+        files = [files] if not isinstance(files, (tuple, list)) else files
 
         if msgs:
             data = await self._CreateData.msg(type_, msgs)
@@ -293,8 +294,8 @@ class User:
 
 
 class File:
-    def type(self, file):
-        if type(file) == str and file.startswith('http'):
+    def type_(self, file):
+        if isinstance(file, str) and file.startswith('http'):
             return MediaType.LINK
 
         if isinstance(file, bytes):
@@ -303,7 +304,7 @@ class File:
         return MediaType.PATH
 
     async def get(self, file: str) -> bytes:
-        type = self.type(file)
+        type = self.type_(file)
 
         if type == MediaType.LINK:
             async with request('get', file) as res:
@@ -315,21 +316,25 @@ class File:
         async with aiopen(file, 'rb') as a:
             return await a.read()
 
-    def b64(self, file_bytes: bytes) -> str:
+    @staticmethod
+    def b64(file_bytes: bytes) -> str:
         return b64encode(file_bytes).decode()
 
     async def process(self, file: str) -> dict[str, Any] | NoReturn:
+        type_ = self.type_(file)
         if (
-            self.type(file) not in (MediaType.LINK, MediaType.BYTES)
+            type_ not in (MediaType.LINK, MediaType.BYTES)
             and not Path(file).exists()
         ):
             raise FileNotFoundError(file)
 
-        ext = file.split('.')[-1]
+        ext = what('', file)
+        file = self.b64(await self.get(file))
+
         if ext in ('png', 'jpeg', 'jpg', 'webp'):
             return {
                 'mediaType': 100,
-                'mediaUploadValue': self.b64(await self.get(file)),
+                'mediaUploadValue': file,
                 'mediaUhqEnabled': True,
             }
 
@@ -337,7 +342,7 @@ class File:
             return {
                 'type': 2,
                 'mediaType': 110,
-                'mediaUploadValue': self.b64(await self.get(file)),
+                'mediaUploadValue': file,
                 'mediaUhqEnabled': True,
             }
 
