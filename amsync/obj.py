@@ -10,7 +10,7 @@ from ujson import dumps, loads
 from pybase64 import b64encode
 from aiofiles import open as aiopen
 
-
+from .enums import MediaType
 from .exceptions import SmallReasonForBan
 
 headers = {
@@ -152,15 +152,12 @@ class Message:
         # fmt: on
 
     class _CreateData:
-        @staticmethod
         async def msg(type_, msgs):
             return [{'type': type_, 'content': i} for i in msgs]
 
-        @staticmethod
         async def file(files):
             return [await File().process(i) for i in files]
 
-        @staticmethod
         async def embed(embed: Embed):
             if embed.image:
                 embed.image = [[100, await upload_media(embed.image), None]]
@@ -296,44 +293,58 @@ class User:
 
 
 class File:
-    def is_link(self, file: str) -> bool:
-        return type(file) == str and file.startswith('http')
+    def type(self, file):
+        if type(file) == str and file.startswith('http'):
+            return MediaType.LINK
+
+        if isinstance(file, bytes):
+            return MediaType.BYTES
+
+        return MediaType.PATH
 
     async def get(self, file: str) -> bytes:
-        if self.is_link(file):
+        type = self.type(file)
+
+        if type == MediaType.LINK:
             async with request('get', file) as res:
                 return await res.read()
+
+        if type == MediaType.BYTES:
+            return file
 
         async with aiopen(file, 'rb') as a:
             return await a.read()
 
-    def to_b64(self, file_bytes: bytes) -> str:
+    def b64(self, file_bytes: bytes) -> str:
         return b64encode(file_bytes).decode()
 
     async def process(self, file: str) -> dict[str, Any] | NoReturn:
-        if not self.is_link(file) and not Path(file).exists():
+        if (
+            self.type(file) not in (MediaType.LINK, MediaType.BYTES)
+            and not Path(file).exists()
+        ):
             raise FileNotFoundError(file)
 
         ext = file.split('.')[-1]
         if ext in ('png', 'jpeg', 'jpg', 'webp'):
             return {
                 'mediaType': 100,
-                'mediaUploadValue': self.to_b64(await self.get(file)),
+                'mediaUploadValue': self.b64(await self.get(file)),
                 'mediaUhqEnabled': True,
             }
 
-        elif ext in ('mp3', 'aac', 'wav', 'm4a'):
+        if ext in ('mp3', 'aac', 'wav', 'm4a'):
             return {
                 'type': 2,
                 'mediaType': 110,
-                'mediaUploadValue': self.to_b64(await self.get(file)),
+                'mediaUploadValue': self.b64(await self.get(file)),
                 'mediaUhqEnabled': True,
             }
 
-        elif ext == 'gif':
+        if ext == 'gif':
             return {
                 'mediaType': 100,
-                'mediaUploadValue': self.to_b64(await self.get(file)),
+                'mediaUploadValue': self.b64(await self.get(file)),
                 'mediaUploadValueContentType': 'image/gif',
                 'mediaUhqEnabled': True,
             }
