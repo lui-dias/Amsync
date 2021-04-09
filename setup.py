@@ -5,7 +5,7 @@ with open('README.md', 'r') as stream:
 
 setup(
     name='Amsync',
-    version='0.0.5',
+    version='0.0.7',
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',
@@ -31,6 +31,7 @@ setup(
         'pybase64',
         'peewee',
         'python-dotenv',
+        'pillow',
     ],
     setup_requires=['wheel'],
     classifiers=[
