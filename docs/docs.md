@@ -11,12 +11,15 @@
     * [join_chat](#event-join-chat)
     * [leave_chat](#event-leave-chat)
     * [image](#event-image)
+* [MakeImage](#makeimage)
+    * [Recreating mee6 rank card](#rank-card)
 * [Objects](#objects)
     * [Chat.messages](#chat.messages)
     * [Chat.clear](#chat.clear)
     * [Chat.members](#chat.members)
     * [Chat.join](#chat.join)
     * [Chat.leave](#chat.leave)
+    * [File.get](#file.get)
     * [User.search](#user.search)
     * [User.ban](#user.ban)
     * [User.unban](#user.unban)
@@ -362,7 +365,27 @@ async def message(m: Message):
     if m.uid != bot.id:
         await bot.send(f'Hello {m.nickname}')
 ```
-<br><br>
+<br>
+<br>
+
+<a id=download></a>
+### **Baixe qualquer arquivo usando o File.get**
+É bem mais simples do que criar uma função que baixe um arquivo
+
+```py
+from amsync import Bot, File, Message
+
+...
+
+@bot.add()
+async def ico(m: Message):
+    icon = await File.get(m.icon)
+    await bot.send(icon)
+...
+```
+<br>
+<br>
+
 # Events
 ### **ready**<a id=event-ready></a>
 When the bot starts
@@ -390,7 +413,273 @@ When a person leaves the chat
 When an image is sent
 <br>
 <br>
+<br>
+
+# **MakeImage**
+Literalmente qualquer batata consegue criar uma imagem com isso
+<br>
+<br>
+<br>
+
+<a id=rank-card></a>
+## **Recreating mee6 rank card**
+<br>
+
+![](gifs/rank-card.gif)
+```py
+from amsync import Bot, MakeImage, Color, Message, File, ProgressBar
+
+
+bot = Bot()
+
+@bot.on()
+async def ready():
+    print('Ready')
+
+
+@bot.add()
+async def rank(m: Message):
+    im = MakeImage.new((934, 282), Color.PRETTY_BLACK)
+    ico = await File.get(m.icon)
+
+    icon = MakeImage.from_bytes(ico)
+    if MakeImage.type(ico) == 'gif':
+        icon = icon.to_img()
+
+    icon.resize((165, 165))
+    icon.circular_thumbnail()
+    icon.add_border(4, Color.BLACK)
+
+    pg = ProgressBar((620, 35), 15, color=Color.CYAN, bg_color=Color.GRAY)
+    pg.update(10)
+    pg.add_border(2, Color.BLACK)
+
+    im.text('RANK', 'center', (135, -45), ('lato.light.ttf', 24))
+    im.text('#1', 'center', (205, -59), ('lato.medium.ttf', 52))
+
+    im.text('LEVEL', 'center', (300, -46), ('lato.light.ttf', 26), Color.CYAN)
+    im.text('1', 'center', (360, -59), ('lato.medium.ttf', 54), Color.CYAN)
+
+    im.text(m.nickname, 'center', (-120, 15), ('lato.medium.ttf', 32))
+
+    im.text('5', 'right', (-170, 15), ('lato.medium.ttf', 26))
+    im.text('/ 100 XP', 'right', (-55, 15), ('lato.medium.ttf', 26), Color.GRAY)
+    
+    im.paste(icon, 'left', (50, 0))
+    im.paste(pg, 'center', (115, 60))
+    await bot.send(files=im.bytes)
+
+bot.run()
+```
+## Baixe as fontes **[aqui](https://www.1001fonts.com/lato-font.html)**
+
+Não sei se é exatamente a mesma fonte do mee6, mas é parecida
+
+## **OBS:** Use **apenas** fontes truetype (.ttf)
+<br>
+<br>
+<br>
+
+Criamos o fundo da imagem
+<br>
+Ela terá **934 de largura** e **282 de altura** (tamanho que o mee6 usa)
+<br>
+E a cor do fundo será, **`Color.PRETTY_BLACK`** (26, 26, 26)
+```py
+im = MakeImage.new((934, 282), Color.PRETTY_BLACK)
+```
+![](imgs/bg.webp)
+<br>
+<br>
+<br>
+
+Baixamos o icone do usuário que enviou o comando
+```py
+ico = await File.get(m.icon)
+```
+<br>
+<br>
+<br>
+
+Transformamos esse icone em uma imagem para editar
+```py
+icon = MakeImage.from_bytes(ico)
+```
+![](imgs/icon.webp)
+<br>
+<br>
+<br>
+
+Porém o icone pode ser um gif, por isso usamos o **`MakeImage.type`** que identifica o tipo do arquivo
+\
+\
+Se for um gif, transformamos em uma imagem
+```py
+if MakeImage.type(ico) == 'gif':
+    icon = icon.to_img()
+```
+<br>
+<br>
+<br>
+
+Para deixar o icone redondo, primeiro precisamos deixar ele quadrado
+\
+**165 de largura** e **165 de altura**
+```py
+icon.resize((165, 165))
+```
+![](imgs/resize.webp)
+<br>
+<br>
+<br>
+
+Deixamos ele redondo
+```py
+icon.circular_thumbnail()
+```
+![](imgs/circle.webp)
+<br>
+<br>
+<br>
+
+Adicionamos uma borda de **4 pixels** com a **cor preta**
+```py
+icon.add_border(4, Color.BLACK)
+```
+![](imgs/border.webp)
+<br>
+<br>
+<br>
+
+Criamos a barra de progresso, com
+
+
+* **620 de largura** e **35 de altura**
+* **15 graus de raio**
+* A cor de fundo **cinza**
+* A cor do preenchimento **ciano**
+```py
+pg = ProgressBar((620, 35), 15, color=Color.CYAN, bg_color=Color.GRAY)
+```
+![](imgs/pg.webp)
+<br>
+<br>
+<br>
+<br>
+
+**OBS:** Não use um raio muito grande, senão a barra de progresso ficará assim
+```py
+ pg = ProgressBar((620, 35), 30, color=Color.CYAN, bg_color=Color.GRAY)
+```
+![](imgs/pg-break.webp)
+<br>
+<br>
+<br>
+<br>
+
+Vamos preencher **10 pixels** da barra de progresso com a cor de preenchimento, ciano
+```py
+pg.update(10)
+```
+![](imgs/update.webp)
+<br>
+<br>
+<br>
+<br>
+
+E adicionar uma borda de **2 pixels** com a **cor preta**
+```py
+pg.add_border(2, Color.BLACK)
+```
+![](imgs/pg-border.webp)
+<br>
+<br>
+<br>
+<br>
+
+Adicionamos um texto com:
+\
+\
+O conteúdo **RANK**
+\
+Posicionado no **centro** da imagem de fundo
+\
+Movendo **135 pixels pra direita** e **45 pixels pra cima**
+\
+Com a fonte **lato.light.ttf** de tamanho **24 pixels**
+\
+Por padrão a cor do texto é **Color.WHITE**
+```py
+im.text('RANK', 'center', (135, -45), ('lato.light.ttf', 24))
+```
+![](imgs/text.webp)
+<br>
+<br>
+<br>
+
+A mesma coisa dita a cima se aplica aqui, porém aqui a cor do texto é **ciano**
+```py
+im.text('LEVEL', 'center', (300, -46), ('lato.light.ttf', 26), Color.CYAN)
+```
+![](imgs/text-color.webp)
+<br>
+<br>
+<br>
+<br>
+
+Aqui o texto será o **nome do usuário** que enviou a mensagem
+```py
+im.text(m.nickname, 'center', (-120, 15), ('lato.medium.ttf', 32))
+```
+![](imgs/text-nick.webp)
+<br>
+<br>
+<br>
+<br>
+
+Para adicionar o icone e a barra de progresso, precimos colar eles na imagem de fundo
+\
+Para isso usamos a funcao **`paste`** que cola as imagens
+\
+\
+Colamos o icone na **esquerda da imagem de fundo**
+\
+Movemos **50 pixels para a direita**
+```py
+im.paste(icon, 'left', (50, 0))
+```
+![](imgs/paste-icon.webp)
+<br>
+<br>
+<br>
+<br>
+
+Colamos a barra de progresso no **centro da imagem de fundo**
+\
+Movemos **115 pixels para a direita** e **65 pixels para baixo**
+```py
+im.paste(pg, 'center', (115, 60))
+```
+![](imgs/paste-pg.webp)
+<br>
+<br>
+<br>
+<br>
+
+Enviamos a imagem criada
+\
+\
+**OBS:** Nao se esqueca do **.bytes**, pois precisamos enviar os bytes da imagem
+```py
+await bot.send(files=im.bytes)
+```
+<br>
+<br>
+<br>
+<br>
+
 # **Objects**
+<br>
 
 ## **Chat.messages**
 Get chat messages
@@ -560,6 +849,12 @@ async def test(m: Message):
 bot.run()
 ```
 Everything said in [Chat.join](#Chat.join) applies here
+<br>
+<br>
+<br>
+
+## **File.get**
+[Recomendacao](#download)
 <br>
 <br>
 <br>
