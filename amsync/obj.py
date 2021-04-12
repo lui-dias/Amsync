@@ -86,6 +86,7 @@ class Message:
         'extensions',
         'file_link',
         'has_mention',
+        'icon',
         'id',
         'media_type',
         'mentioned_users',
@@ -113,6 +114,7 @@ class Message:
                                                 if exist(self.extensions, 'mentionedArray')
                                                 else False
                                             )
+        self.icon:            str | None       = exist(_cm['author'], 'icon')
         self.id:              str | None       = exist(_cm, 'messageId')
         self.media_type:      str | None       = exist(_cm, 'mediaType')
         self.mentioned_users: list[str] | None = (
@@ -294,7 +296,8 @@ class User:
 
 
 class File:
-    def type_(self, file):
+    @staticmethod
+    def type_(file):
         if isinstance(file, str) and file.startswith('http'):
             return MediaType.LINK
 
@@ -303,8 +306,9 @@ class File:
 
         return MediaType.PATH
 
-    async def get(self, file: str) -> bytes:
-        type = self.type_(file)
+    @staticmethod
+    async def get(file: str) -> bytes:
+        type = File.type_(file)
 
         if type == MediaType.LINK:
             async with request('get', file) as res:
