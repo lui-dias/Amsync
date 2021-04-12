@@ -1,6 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from io import BytesIO
-from contextlib import contextmanager
+from pathlib import Path
+from imghdr import what
 
 
 class Color:
@@ -8,6 +9,7 @@ class Color:
     RED    = (255, 0, 0)
     GREEN  = (0, 255, 0)
     BLUE   = (0, 0, 255)
+    CYAN   = (0, 255, 255)
     ORANGE = (255, 128, 0)
     YELLOW = (255, 255, 0)
     GREEN  = (0, 255, 0)
@@ -17,7 +19,9 @@ class Color:
     WHITE  = (255, 255, 255)
     GRAY   = (128, 128, 128)
     BLACK  = (0, 0, 0)
-    TRNASPARENT = (0, 0, 0, 0)
+    TRANSPARENT = (0, 0, 0, 0)
+
+    PRETTY_BLACK = (26, 26, 26)
     # fmt: on
 
 
@@ -35,6 +39,10 @@ class MakeImage:
         self.save(arr)
         return arr.getvalue()
 
+    @staticmethod
+    def type(b):
+        return what('', b)
+
     @classmethod
     def new(cls, size, color=Color.WHITE):
         return cls(Image.new('RGBA', size, color))
@@ -42,6 +50,10 @@ class MakeImage:
     @classmethod
     def open(cls, path):
         return cls(Image.open(path))
+
+    @classmethod
+    def from_bytes(cls, b):
+        return cls(Image.open(BytesIO(b)))
 
     @classmethod
     def convert(cls, im):
@@ -59,9 +71,9 @@ class MakeImage:
 
     def resize(self, size, preserve_aspect=False):
         if preserve_aspect:
-            self.img.thumbnail(size, Image.ANTIALIAS)
+            self.img.thumbnail(size, Image.BICUBIC)
         else:
-            self.img = self.img.resize(size, Image.ANTIALIAS)
+            self.img = self.img.resize(size, Image.BICUBIC)
 
     def crop(self, size):
         W, H = self.size
@@ -104,8 +116,8 @@ class MakeImage:
         text,
         position=None,
         move=(0, 0),
-        color=(255, 255, 255),
         font=None,
+        color=Color.WHITE,
         stroke=0,
         stroke_color=Color.BLACK,
     ):
@@ -120,63 +132,82 @@ class MakeImage:
             self.calc((w, h), move=move, position=position),
             text,
             font=font,
-            color=color,
+            fill=color,
             stroke_width=stroke,
             stroke_fill=stroke_color,
         )
 
-    def paste(self, im, pos):
+    def paste(self, im, position=None, move=(0, 0)):
         if isinstance(im, MakeImage):
             im = im.img
-        self.img.paste(im, pos, im)
+        self.img.paste(
+            im, self.calc(self.get_image_pos(im), position, move), im
+        )
 
-    def create_circle_mask(self):
+    def circular_thumbnail(self):
         w, h = self.size
-        bigsize = w * 3, h * 3
-        mask = Image.new('L', bigsize, 0)
-        draw = ImageDraw.Draw(mask)
-        draw.ellipse((0, 0) + bigsize, fill=255)
-        return mask.resize(self.size, Image.ANTIALIAS)
+        w, h = w * 3, h * 3
+        mask = Image.new('L', (w, h), 0)
 
-    def add_mask(self, mask):
+        # Place the entire mask in the center of the image, without the 5, part of the mask's edges is slightly cut
+        ImageDraw.Draw(mask).ellipse((5, 5, w - 5, h - 5), fill=255)
+        mask = mask.resize(self.size, Image.BICUBIC)
+        self.img = ImageOps.fit(self.img, mask.size, Image.BICUBIC)
         self.img.putalpha(mask)
-        ImageOps.fit(self.img, mask.size, centering=(0.5, 0.5)).putalpha(mask)
 
-    @contextmanager
-    def antialiasing(self, quantity=2):
-        w, h = self.size
-        self.resize((w * quantity, h * quantity))
-        yield
-        self.resize((w, h))
+    def to_img(self, n_frame=0):
+        self.img.seek(n_frame)
+        self.save('tmp.webp')
+        with open('tmp.webp', 'rb') as tmp:
+            tmp = self.__class__.from_bytes(tmp.read())
+        Path('tmp.webp').unlink(missing_ok=True)
+        return tmp
 
-    def add_border(
-        self, size, color=Color.WHITE, type_='circle', antialiasing=2
-    ):
+    def add_border(self, size, color=Color.WHITE):
+        # The border size must be an even number
+        size += size % 2
         W, H = self.size
-        with self.antialiasing(antialiasing):
-            if type_ == 'circle':
-                ImageDraw.Draw(self.img).arc(
-                    (0, 0, *self.size), 0, 360, fill=color, width=size
-                )
-            elif type_ == 'square':
-                ImageDraw.Draw(self.img).line(
-                    (0, -1 + size // 2, W, -1 + size // 2),
-                    fill=color,
-                    width=size,
-                )
-                ImageDraw.Draw(self.img).line(
-                    (W - size // 2, H, W - size // 2, 0), fill=color, width=size
-                )
-                ImageDraw.Draw(self.img).line(
-                    (0, H - 1 - size // 2, W, H - 1 - size // 2),
-                    fill=color,
-                    width=size,
-                )
-                ImageDraw.Draw(self.img).line(
-                    (0 + size // 2, H, 0 + size // 2, 0), fill=color, width=size
-                )
-            else:
-                raise Exception(f'Invalid type: "{type_}"')
+
+        mask = self.img.copy().resize((W + size, H + size))
+        fill = Image.new('RGBA', (W + size, H + size), color)
+        bg = Image.new('RGBA', (W + size, H + size), Color.TRANSPARENT)
+
+        w, h = bg.size
+
+        bg.paste(fill, mask=mask)
+        bg.paste(self.img, ((w - W) // 2, (h - H) // 2), self.img)
+
+        self.img = bg
 
     def show(self):
         self.img.show()
+
+
+class ProgressBar(MakeImage):
+    def __init__(
+        self, size, radius=30, color=Color.WHITE, bg_color=Color.PRETTY_BLACK
+    ):
+        w, h = size
+        self.img = Image.new('RGBA', (w, h), Color.TRANSPARENT)
+        self.radius = radius
+        self.color = color
+        self.bg = bg_color
+
+        ImageDraw.Draw(self.img).rounded_rectangle((0, 0, w, h), radius, color)
+
+    def update(self, px):
+        w, h = self.img.size
+
+        bg_fill = self.img.copy()
+        bg = self.img.copy()
+
+        pixdata = bg_fill.load()
+
+        for y in range(bg_fill.size[1]):
+            for x in range(bg_fill.size[0]):
+                if pixdata[x, y] == (*self.color, 255):
+                    pixdata[x, y] = (*self.bg, 255)
+
+        bg_fill = bg_fill.crop((0, 0, px * 2, h))
+        bg.paste(bg_fill, mask=bg_fill)
+        self.img = bg.resize((w, h), Image.BICUBIC)
