@@ -165,12 +165,11 @@ class MakeImage:
 
     def add_border(self, size, color=Color.WHITE):
         # The border size must be an even number
-        size += size % 2
         W, H = self.size
 
-        mask = self.img.copy().resize((W + size, H + size))
-        fill = Image.new('RGBA', (W + size, H + size), color)
-        bg = Image.new('RGBA', (W + size, H + size), Color.TRANSPARENT)
+        mask = self.img.copy().resize((W + size * 2, H + size * 2))
+        fill = Image.new('RGBA', (W + size * 2, H + size * 2), color)
+        bg = Image.new('RGBA', (W + size * 2, H + size * 2), Color.TRANSPARENT)
 
         w, h = bg.size
 
@@ -193,7 +192,9 @@ class ProgressBar(MakeImage):
         self.color = color
         self.bg = bg_color
 
-        ImageDraw.Draw(self.img).rounded_rectangle((0, 0, w, h), radius, color)
+        ImageDraw.Draw(self.img).rounded_rectangle(
+            (0, 0, w, h), radius, bg_color
+        )
 
     def update(self, px):
         w, h = self.img.size
@@ -205,8 +206,8 @@ class ProgressBar(MakeImage):
 
         for y in range(bg_fill.size[1]):
             for x in range(bg_fill.size[0]):
-                if pixdata[x, y] == (*self.color, 255):
-                    pixdata[x, y] = (*self.bg, 255)
+                if pixdata[x, y] == (*self.bg, 255):
+                    pixdata[x, y] = (*self.color, 255)
 
         bg_fill = bg_fill.crop((0, 0, px * 2, h))
         bg.paste(bg_fill, mask=bg_fill)
