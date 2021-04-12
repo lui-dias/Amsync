@@ -448,7 +448,7 @@ async def rank(m: Message):
 
     icon.resize((165, 165))
     icon.circular_thumbnail()
-    icon.add_border(4, Color.BLACK)
+    icon.add_border(2, Color.BLACK)
 
     pg = ProgressBar((620, 35), 15, color=Color.CYAN, bg_color=Color.GRAY)
     pg.update(10)
