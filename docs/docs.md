@@ -50,7 +50,7 @@ bot.run()
 ```
 \
 \
-**OBS:** It is not necessary to import **`Message`**, however by setting the type of the function parameter to **`Message`** (as done in the **`hello`** function), it allows the IDE to display the values of the parameters, see [recommendation](#use-typing)
+**NOTE:** It is not necessary to import **`Message`**, however by setting the type of the function parameter to **`Message`** (as done in the **`hello`** function), it allows the IDE to display the values of the parameters, see [recommendation](#use-typing)
 \
 \
 Imports the required classes
@@ -66,7 +66,7 @@ bot = Bot('email', 'password')
 \
 \
 To change the prefix
-<br>**OBS:** By default the prefix is **/**
+<br>**NOTE:** By default the prefix is **/**
 ```py
 bot = Bot('email', 'password', prefix='prefix')
 ```
@@ -103,9 +103,9 @@ Creates a command
 ```
 \
 \
-**OBS:** All commands receive the class **`Message`** as a parameter
+**NOTE:** All commands receive the class **`Message`** as a parameter
 \
-**OBS:** As [said](#use-typing), it is optional to set the parameter type to **`Message`**, but I personally recommend
+**NOTE:** As [said](#use-typing), it is optional to set the parameter type to **`Message`**, but I personally recommend
 \
 \
 Insert the **command name** in the **function name**
@@ -166,9 +166,9 @@ img='https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885__340.jpg'
 We can also send **gifs** and **audios** (videos I haven't implemented yet). But how about sending everything together?
 \
 \
-**OBS:** The audios can have a maximum of 3 minutes, it is the limit of the amino
+**NOTE:** The audios can have a maximum of 3 minutes, it is the limit of the amino
 \
-**OBS:** The gif didn't appear because I used the amino web, and it doesn't show gif apparently, but the gif was sent
+**NOTE:** The gif didn't appear because I used the amino web, and it doesn't show gif apparently, but the gif was sent
 
 ![](gifs/send-files.gif)
 ```py
@@ -229,7 +229,7 @@ bot.run()
 \
 We check if the message text is the same as Hello
 \
-**OBS:** You can also check any attribute of the **`Message`** class in addition to **`text`**
+**NOTE:** You can also check any attribute of the **`Message`** class in addition to **`text`**
 ```py
 def check(_m: Message):
     return _m.text == 'Hello'
@@ -416,7 +416,7 @@ When an image is sent
 <br>
 
 # **MakeImage**
-Literalmente qualquer batata consegue criar uma imagem com isso
+Literally any potato can create an image out of it
 <br>
 <br>
 <br>
@@ -471,20 +471,18 @@ async def rank(m: Message):
 
 bot.run()
 ```
-## Baixe as fontes **[aqui](https://www.1001fonts.com/lato-font.html)**
+## Download the fonts **[here](https://www.1001fonts.com/lato-font.html)**
 
-Não sei se é exatamente a mesma fonte do mee6, mas é parecida
+I don't know if it's exactly the same source as mee6, but it's similar
 
-## **OBS:** Use **apenas** fontes truetype (.ttf)
+### Use **only** truetype fonts (.ttf)
 <br>
 <br>
 <br>
 
-Criamos o fundo da imagem
-<br>
-Ela terá **934 de largura** e **282 de altura** (tamanho que o mee6 usa)
-<br>
-E a cor do fundo será, **`Color.PRETTY_BLACK`** (26, 26, 26)
+We create the background of the image
+* It will be **934px width** and **282px height** (size that mee6 uses)
+* And the background color will be **`Color.PRETTY_BLACK`** (26, 26, 26)
 ```py
 im = MakeImage.new((934, 282), Color.PRETTY_BLACK)
 ```
@@ -493,7 +491,7 @@ im = MakeImage.new((934, 282), Color.PRETTY_BLACK)
 <br>
 <br>
 
-Baixamos o icone do usuário que enviou o comando
+We downloaded the icon of the user who sent the command
 ```py
 ico = await File.get(m.icon)
 ```
@@ -501,7 +499,7 @@ ico = await File.get(m.icon)
 <br>
 <br>
 
-Transformamos esse icone em uma imagem para editar
+We transformed this icon into an image to edit
 ```py
 icon = MakeImage.from_bytes(ico)
 ```
@@ -510,10 +508,10 @@ icon = MakeImage.from_bytes(ico)
 <br>
 <br>
 
-Porém o icone pode ser um gif, por isso usamos o **`MakeImage.type`** que identifica o tipo do arquivo
+However, the icon can be a gif, so we use **`MakeImage.type`** that identifies the file type
 \
 \
-Se for um gif, transformamos em uma imagem
+If it's a gif, we transform it into an image
 ```py
 if MakeImage.type(ico) == 'gif':
     icon = icon.to_img()
@@ -522,9 +520,9 @@ if MakeImage.type(ico) == 'gif':
 <br>
 <br>
 
-Para deixar o icone redondo, primeiro precisamos deixar ele quadrado
+To make the icon round, first we need to make it square
 \
-**165 de largura** e **165 de altura**
+**165px width** e **165px height**
 ```py
 icon.resize((165, 165))
 ```
@@ -533,7 +531,7 @@ icon.resize((165, 165))
 <br>
 <br>
 
-Deixamos ele redondo
+We rounded
 ```py
 icon.circular_thumbnail()
 ```
@@ -542,7 +540,7 @@ icon.circular_thumbnail()
 <br>
 <br>
 
-Adicionamos uma borda de **4 pixels** com a **cor preta**
+We added a **4px** border with **black color**
 ```py
 icon.add_border(4, Color.BLACK)
 ```
@@ -551,13 +549,11 @@ icon.add_border(4, Color.BLACK)
 <br>
 <br>
 
-Criamos a barra de progresso, com
-
-
-* **620 de largura** e **35 de altura**
-* **15 graus de raio**
-* A cor de fundo **cinza**
-* A cor do preenchimento **ciano**
+We created the progress bar, with
+* **620px width** and **35px height**
+* **15px radius**
+* The background color, **gray**
+* The fill color, **cyan**
 ```py
 pg = ProgressBar((620, 35), 15, color=Color.CYAN, bg_color=Color.GRAY)
 ```
@@ -567,7 +563,7 @@ pg = ProgressBar((620, 35), 15, color=Color.CYAN, bg_color=Color.GRAY)
 <br>
 <br>
 
-**OBS:** Não use um raio muito grande, senão a barra de progresso ficará assim
+**NOTE:** Do not use too large a radius, otherwise the progress bar will look like this
 ```py
  pg = ProgressBar((620, 35), 30, color=Color.CYAN, bg_color=Color.GRAY)
 ```
@@ -577,7 +573,7 @@ pg = ProgressBar((620, 35), 15, color=Color.CYAN, bg_color=Color.GRAY)
 <br>
 <br>
 
-Vamos preencher **10 pixels** da barra de progresso com a cor de preenchimento, ciano
+Let's fill **10px** of the progress bar with the fill color, cyan
 ```py
 pg.update(10)
 ```
@@ -587,7 +583,7 @@ pg.update(10)
 <br>
 <br>
 
-E adicionar uma borda de **2 pixels** com a **cor preta**
+Add a **2px** border with **black color**
 ```py
 pg.add_border(2, Color.BLACK)
 ```
@@ -597,18 +593,12 @@ pg.add_border(2, Color.BLACK)
 <br>
 <br>
 
-Adicionamos um texto com:
-\
-\
-O conteúdo **RANK**
-\
-Posicionado no **centro** da imagem de fundo
-\
-Movendo **135 pixels pra direita** e **45 pixels pra cima**
-\
-Com a fonte **lato.light.ttf** de tamanho **24 pixels**
-\
-Por padrão a cor do texto é **Color.WHITE**
+We added a text with:
+* Content **RANK**
+* Positioned in the **center** of the background image
+* Moving **135px to right** and **45px to top**
+* With the font **lato.light.ttf** of size **24px**
+* By default the text color is **Color.WHITE**
 ```py
 im.text('RANK', 'center', (135, -45), ('lato.light.ttf', 24))
 ```
@@ -617,7 +607,7 @@ im.text('RANK', 'center', (135, -45), ('lato.light.ttf', 24))
 <br>
 <br>
 
-A mesma coisa dita a cima se aplica aqui, porém aqui a cor do texto é **ciano**
+The same thing said above applies here, but here the text color is **cyan**
 ```py
 im.text('LEVEL', 'center', (300, -46), ('lato.light.ttf', 26), Color.CYAN)
 ```
@@ -627,7 +617,7 @@ im.text('LEVEL', 'center', (300, -46), ('lato.light.ttf', 26), Color.CYAN)
 <br>
 <br>
 
-Aqui o texto será o **nome do usuário** que enviou a mensagem
+Here the text will be the **name of the user** who sent the message
 ```py
 im.text(m.nickname, 'center', (-120, 15), ('lato.medium.ttf', 32))
 ```
@@ -637,14 +627,11 @@ im.text(m.nickname, 'center', (-120, 15), ('lato.medium.ttf', 32))
 <br>
 <br>
 
-Para adicionar o icone e a barra de progresso, precimos colar eles na imagem de fundo
+To add the icon and the progress bar, we need to paste them into the background image
 \
-Para isso usamos a funcao **`paste`** que cola as imagens
-\
-\
-Colamos o icone na **esquerda da imagem de fundo**
-\
-Movemos **50 pixels para a direita**
+For this we use the function **`paste`** that pastes the images
+* We paste the icon to the **left of the background image**
+* We moved **50px to right**
 ```py
 im.paste(icon, 'left', (50, 0))
 ```
@@ -654,9 +641,8 @@ im.paste(icon, 'left', (50, 0))
 <br>
 <br>
 
-Colamos a barra de progresso no **centro da imagem de fundo**
-\
-Movemos **115 pixels para a direita** e **65 pixels para baixo**
+* We paste the progress bar in the **center of the background image**
+* We moved **115px to right** and **65px to bottom**
 ```py
 im.paste(pg, 'center', (115, 60))
 ```
@@ -666,10 +652,10 @@ im.paste(pg, 'center', (115, 60))
 <br>
 <br>
 
-Enviamos a imagem criada
+We send the created image
 \
 \
-**OBS:** Nao se esqueca do **.bytes**, pois precisamos enviar os bytes da imagem
+**NOTE:** Do not forget the **.bytes**, as we need to send the image bytes
 ```py
 await bot.send(files=im.bytes)
 ```
@@ -699,7 +685,7 @@ async def test(m: Message):
 
 bot.run()
 ```
-**OBS:** If the bot **takes too long to show the messages** it is because the way the amino uses it to get the chat messages **is by token** and **not by index**, that is, **in a chat with 10k messages the bot can only get every 100 messages**, and not all at once.
+**NOTE:** If the bot **takes too long to show the messages** it is because the way the amino uses it to get the chat messages **is by token** and **not by index**, that is, **in a chat with 10k messages the bot can only get every 100 messages**, and not all at once.
 \
 So a basic calculation, remembering that **it takes ~ 0.2s to get 100 messages**
 \
@@ -731,7 +717,7 @@ To get the **first 100 chat messages** for example, set the **`start`** and **`e
 ```py
 await chat.messages(check=check, start=0, end=100)
 ```
-**OBS: `start`** and **`end`** work like a python list, **0** is the **most recent message**, **-1** is the **most old**
+**NOTE: `start`** and **`end`** work like a python list, **0** is the **most recent message**, **-1** is the **most old**
 <br>
 <br>
 <br>
@@ -825,7 +811,7 @@ await chat.join(['chat_id', 'chat_id', 'chat_id'])
 \
 And specify the community
 \
-**OBS:** By default, **com_id** is the community where the message was sent
+**NOTE:** By default, **com_id** is the community where the message was sent
 ```py
 await chat.join('chat_id', 'com_id')
 ```
@@ -881,7 +867,7 @@ bot.run()
 ```
 \
 \
-**OBS:** You **need** put parentheses around **`await user.search(m.uid)`**, otherwise it will give an error
+**NOTE:** You **need** put parentheses around **`await user.search(m.uid)`**, otherwise it will give an error
 \
 \
 **`User.search`** returns a list of **`User`**, we access the first item in the list and obtain the user level
