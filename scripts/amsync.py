@@ -1,7 +1,7 @@
 import sys
 from sys import argv
 from re import search
-from subprocess import run
+from subprocess import run as _run
 from colorama import Fore, init
 from platform import system
 from pathlib import Path
@@ -10,7 +10,7 @@ init()
 
 def clear():
     a = 'cls' if system() == 'Windows' else 'clear'
-    run(a, shell=True)
+    _run(a, shell=True)
 
 def exit(m):
     print(m)
@@ -99,7 +99,7 @@ def run(cmds):
     for text, cmd in cmds.items():
         if text:
             print(text)
-        tmp = run(cmd, capture_output=True, text=True, shell=True)
+        tmp = _run(cmd, capture_output=True, text=True, shell=True)
         if tmp.returncode:
             print(f'{Fore.RED}Error in: {Fore.RESET}{cmd}')
             if tmp.stderr:
