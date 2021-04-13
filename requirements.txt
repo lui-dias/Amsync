@@ -5,3 +5,4 @@ pybase64
 peewee
 python-dotenv
 pillow
+colorama
