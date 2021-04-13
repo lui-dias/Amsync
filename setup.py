@@ -5,7 +5,7 @@ with open('README.md', 'r') as stream:
 
 setup(
     name='Amsync',
-    version='0.0.10',
+    version='0.0.12',
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',
@@ -32,6 +32,7 @@ setup(
         'peewee',
         'python-dotenv',
         'pillow',
+        'colorama'
     ],
     setup_requires=['wheel'],
     classifiers=[
@@ -41,5 +42,10 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3.8',
     ],
+    entry_points={
+        "console_scripts": [
+            "amsync = scripts.amsync:main",
+        ]
+    },
     packages=find_packages(),
 )
