@@ -8,7 +8,7 @@ Created with the aim that, anyone with basic knowledge of python, create any bot
 Installation
 ==========
 ```
-pip install Asymc
+pip install Amsync
 ```
 <br>
 <br>
