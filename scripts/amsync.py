@@ -72,8 +72,10 @@ def init():
         f.write('amsync')
 
     if not Path('.env').exists():
-        email = input(f'{Fore.CYAN}Email{Fore.WHITE}: ')
-        password = input(f'{Fore.CYAN}Password{Fore.WHITE}: ')
+        print(f'{Fore.CYAN}Email{Fore.WHITE}: ', end='')
+        email = input()
+        print(f'{Fore.CYAN}Password{Fore.WHITE}: ', end='')
+        password = input()
         with open('.env', 'w') as f:
             f.write(f'EMAIL={email}\nPASSWORD={password}')
     
