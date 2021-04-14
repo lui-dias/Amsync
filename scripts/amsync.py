@@ -172,5 +172,4 @@ def main():
                 break
 
             clear()
-            print(f'Destroying {Fore.CYAN}{app[n]}{Fore.WHITE}')
-            run(destroy(app[n]))
+            print(run(destroy(app[n])))
