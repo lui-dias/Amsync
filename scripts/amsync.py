@@ -17,6 +17,9 @@ def exit(m):
     sys.exit(1)
 
 def create(name):
+    if Path('.git').exists():
+        _run('rmdir .git /s /q', shell=True)
+
     return {
         'Starting repository':                               'git init',
         'Adding files':                                      'git add .',
@@ -78,7 +81,7 @@ def init():
         password = input()
         with open('.env', 'w') as f:
             f.write(f'EMAIL={email}\nPASSWORD={password}')
-    
+
     if not Path('bot.py').exists():
         with open('bot.py', 'w') as f:
             f.write(
@@ -148,7 +151,7 @@ def main():
 
     elif args == 'apps':
         print(run(apps()))
-            
+
 
     elif 'destroy' in args:
         try:
@@ -158,7 +161,7 @@ def main():
             app = run(apps()).split('\n')[1:-2]
             if not app or not app[0]:
                 exit('No project found')
-            while True:    
+            while True:
                 clear()
                 for i, e in enumerate(app):
                     print(f'{Fore.CYAN}{i}. {Fore.WHITE}{e}')
