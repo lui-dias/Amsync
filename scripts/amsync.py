@@ -72,8 +72,10 @@ def init():
         f.write('amsync')
 
     if not Path('.env').exists():
+        email = input(f'{Fore.CYAN}Email{Fore.WHITE}: ')
+        password = input(f'{Fore.CYAN}Password{Fore.WHITE}: ')
         with open('.env', 'w') as f:
-            f.write('EMAIL=\nPASSWORD=')
+            f.write(f'EMAIL={email}\nPASSWORD={password}')
     
     if not Path('bot.py').exists():
         with open('bot.py', 'w') as f:
@@ -127,6 +129,10 @@ def main():
 
     if args == 'workers':
         print(run(workers()))
+
+    if args == 'update':
+        run(update())
+        print('Done')
 
     if 'create' in args:
         try:
