@@ -1,9 +1,10 @@
 from setuptools import setup, find_packages
 
-from .amsync.obj import __version__
 
 with open('README.md', 'r') as stream:
     long_description = stream.read()
+
+__version__ = '0.0.17'
 
 setup(
     name='Amsync',
