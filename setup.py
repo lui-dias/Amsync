@@ -5,7 +5,7 @@ with open('README.md', 'r') as stream:
 
 setup(
     name='Amsync',
-    version='0.0.15',
+    version='0.0.16',
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',
