@@ -1012,8 +1012,7 @@ Everything said in [My.chats](#My.chats) applies here
 ## **Community.chats**
 Shows all public chats in a community
 ```py
-from amsync import Bot, Community
-from amsync.obj import Message
+from amsync import Bot, Message, Community
 
 bot = Bot()
 
