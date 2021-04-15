@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from os import environ
+import sys
+from os import environ, execl
 from asyncio import (
     get_event_loop,
     run_coroutine_threadsafe,
@@ -11,15 +12,23 @@ from dotenv import load_dotenv
 from typing import Any, Callable, Awaitable, Coroutine
 from pathlib import Path
 from threading import Thread
+from subprocess import run
+from pathlib import Path
 
+from aiohttp import ClientSession
+from colorama import Fore, init
+from ujson import loads
+
+from . import obj
 from .ws import Ws
+from .db import DB
 from .obj import Message
 from .exceptions import AccountNotFoundInDotenv, InvalidDotenvKeys
 
 Coro_return_Message = Callable[[], Coroutine[Message, None, None]]
 Coro_return_Any = Callable[[], Coroutine[Any, None, None]]
 Coro_return_None = Callable[[], Coroutine[None, None, None]]
-
+init()
 
 class Bot:
     def __init__(
@@ -41,9 +50,11 @@ class Bot:
         if not self._email or not self._password:
             raise AccountNotFoundInDotenv('Put your email and password in .env')
 
+        obj.clear()
         self._prefix = prefix
         self._msg = Message()
         self._loop = get_event_loop()
+        self._db = DB()
         self.id = None
 
         if only_chats and ignore_chats:
@@ -100,7 +111,26 @@ class Bot:
 
         return foo
 
+    async def check_update(self):
+        if self._db.lib_need_update():
+            async with ClientSession(json_serialize=loads) as s:
+                async with s.get('https://pypi.org/pypi/Amsync/json') as res:
+                    new = (await res.json(loads=loads))['info']['version']
+                    if new != obj.__version__:
+                        print(f'There is a new version: {Fore.CYAN}{new}{Fore.WHITE}\nDo you want to update it? (Y/n) ', end='')
+                        if input().lower() == 'y':
+                            obj.clear()
+                            print('Updating')
+                            if self._db.deps_need_update():
+                                run('pip install -U --force-reinstall --no-cache amsync', capture_output=True, text=True)
+                            run('pip uninstall -y amsync', capture_output=True, text=True)
+                            run('pip install amsync --no-cache', capture_output=True, text=True)
+                            obj.clear()
+                            execl(sys.executable, Path(__file__).absolute(), *sys.argv)
+                        obj.clear()
+
     def run(self) -> None:
+        self._loop.run_until_complete(self.check_update())
         self._ws = Ws(self._email, self._password, self.only_chats, self.ignore_chats)
 
         Thread(target=self._loop.run_forever).start()

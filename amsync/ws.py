@@ -25,7 +25,7 @@ class Ws:
         self._deviceid = obj.headers['NDCDEVICEID']
         self._email = email
         self._password = password
-        self._account = DB()
+        self._db = DB()
         self._loop = get_event_loop()
         self._only_chats = only_chats
         self._ignore_chats = ignore_chats
@@ -37,7 +37,6 @@ class Ws:
             'secret': f'0 {self._password}',
             'deviceID': self._deviceid,
         }
-
         return (await req('post', 'g/s/auth/login', data=data))['sid']
 
     async def _connect(self) -> AsyncIterator[Message]:
@@ -88,12 +87,12 @@ class Ws:
         ],
         bot,
     ) -> None:
-        if not self._account.get(self._email):
-            self._account.add(self._email, await self._get_sid())
+        if not self._db.get_account(self._email):
+            self._db.add_account(self._email, await self._get_sid())
 
         # Sometimes sid can be an invalid base64, causing a padding error in urlsafe_b64decode
         # Adding == at the end of sid solves the problem
-        tmp = self._account.get(self._email)
+        tmp = self._db.get_account(self._email)
         sid = tmp + '=' * (192 - len(tmp))
 
         obj.headers['NDCAUTH'] = f'sid={sid}'

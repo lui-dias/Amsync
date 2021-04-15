@@ -5,6 +5,8 @@ from typing import Any, Callable, NoReturn, Dict
 from pathlib import Path
 from unicodedata import normalize
 from imghdr import what
+from subprocess import run
+from platform import system
 
 from aiohttp import request
 from ujson import dumps, loads
@@ -13,6 +15,9 @@ from aiofiles import open as aiopen
 
 from .enums import MediaType
 from .exceptions import SmallReasonForBan
+
+
+__version__ = '0.0.16'
 
 headers = {
     'NDCDEVICEID': '0146BD6CF162E40F7449AFF316BA524DDDE1A1C4E6D99A553F3472EC3F4CB2F6A9ED05E5100492DC76'
@@ -24,6 +29,9 @@ bot_id = None
 
 Req_json = Dict[str, Any]
 
+
+def clear():
+    run('cls' if system() == 'Windows' else 'clear', shell=True)
 
 def exist(d: Req_json, k: str, *, in_str: bool = True):
     try:
