@@ -196,7 +196,7 @@ class Message:
 
         com = actual_com or com
         chat = actual_chat or chat
-        files = [files] if not isinstance(files, (tuple, list)) else files
+        files = [files] if files and not isinstance(files, (tuple, list)) else files
 
         if msgs:
             data = await self._CreateData.msg(type_, msgs)
