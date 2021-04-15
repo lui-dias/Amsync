@@ -17,7 +17,7 @@ from .enums import MediaType
 from .exceptions import SmallReasonForBan
 
 
-__version__ = '0.0.16'
+__version__ = '0.0.17'
 
 headers = {
     'NDCDEVICEID': '0146BD6CF162E40F7449AFF316BA524DDDE1A1C4E6D99A553F3472EC3F4CB2F6A9ED05E5100492DC76'
