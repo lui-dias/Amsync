@@ -362,6 +362,16 @@ class File:
 
 
 class Chat:
+    __slots__ = ('id',
+                 'is_private',
+                 'name')
+
+    def __init__(self, j=None):
+        if j:
+            self.id = exist(j, 'threadId')
+            self.is_private = exist(j, 'membersQuota') == 2
+            self.name = exist(j, 'title')
+
     async def messages(
         self,
         *,
