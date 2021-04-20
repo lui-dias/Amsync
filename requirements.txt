@@ -1,8 +1,8 @@
 aiohttp
-aiofiles
 ujson
 pybase64
 peewee
 python-dotenv
 pillow
 colorama
+python-magic-bin
