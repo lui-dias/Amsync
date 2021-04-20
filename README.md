@@ -1,20 +1,28 @@
-Amsync
-============
+# Amsync
 
 Created with the aim that, anyone with basic knowledge of python, create any bot without much difficulty
 <br>
 <br>
 
-Installation
-==========
+# Installation
+
 ```
 pip install Amsync
 ```
 <br>
 <br>
 
-Minimal example
-==============
+# Update
+
+```
+pip install Amsync -U --force-reinstall --no-dps
+```
+Or wait a while for a message to appear in the program and it will update itself
+
+<br>
+<br>
+
+# Minimal example
 
 ```py
 from amsync import Bot, Message
