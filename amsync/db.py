@@ -1,7 +1,13 @@
 from time import time
 from contextlib import contextmanager
 
-from peewee import SqliteDatabase, CharField, IntegerField, Model, OperationalError
+from peewee import (
+    SqliteDatabase,
+    CharField,
+    IntegerField,
+    Model,
+    OperationalError
+)
 
 
 db = SqliteDatabase('db.db')
@@ -29,6 +35,8 @@ def query():
     try:
         db.connect()
         yield
+
+    # Database is already connected
     except OperationalError:
         yield
     finally:
@@ -54,7 +62,7 @@ class DB:
                 return acc.sid
             except Account.DoesNotExist:
                 return None
-        
+
     def update_time_of(self, attr):
         with query():
             up = Update.get()
@@ -82,4 +90,3 @@ class DB:
             if int(time()) - Update.get().up_deps_in >= _3_DAYS:
                 self.update_time_of('deps')
                 return True
-    
