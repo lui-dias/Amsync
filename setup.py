@@ -4,11 +4,9 @@ from setuptools import setup, find_packages
 with open('README.md', 'r') as stream:
     long_description = stream.read()
 
-__version__ = '0.0.17'
-
 setup(
     name='Amsync',
-    version=__version__,
+    version='0.0.28',
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',
@@ -29,25 +27,23 @@ setup(
     ],
     install_requires=[
         'aiohttp',
-        'aiofiles',
         'ujson',
         'pybase64',
         'peewee',
         'python-dotenv',
         'pillow',
-        'colorama'
+        'colorama',
+        'python-magic-bin'
     ],
     setup_requires=['wheel'],
     classifiers=[
-        'Development Status :: 1 - Planning',
         'License :: OSI Approved :: MIT License',
-        'Natural Language :: English',
-        'Operating System :: OS Independent',
+        'Operating System :: Microsoft :: Windows'
         'Programming Language :: Python :: 3.8',
     ],
     entry_points={
-        "console_scripts": [
-            "amsync = scripts.amsync:main",
+        'console_scripts': [
+            'amsync = scripts.amsync:main',
         ]
     },
     packages=find_packages(),
