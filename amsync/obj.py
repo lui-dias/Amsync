@@ -1,71 +1,79 @@
 from __future__ import annotations
 
-from asyncio import gather
 from typing import Any, Callable, NoReturn, Dict
 from pathlib import Path
-from unicodedata import normalize
-from imghdr import what
-from subprocess import run
+from asyncio import gather
 from platform import system
+from subprocess import run
+from contextlib import suppress
+from unicodedata import normalize
 
+from magic import from_buffer
+from ujson import dumps, loads, dump
 from aiohttp import request
-from ujson import dumps, loads
 from pybase64 import b64encode
-from aiofiles import open as aiopen
 
-from ..setup import __version__
-from .enums import MediaType
-from .exceptions import SmallReasonForBan
+from .enum import MediaType
+from .exceptions import (
+    SmallReasonForBan,
+    InvalidFileType
+)
 
 
-headers = {
-    'NDCDEVICEID': '0146BD6CF162E40F7449AFF316BA524DDDE1A1C4E6D99A553F3472EC3F4CB2F6A9ED05E5100492DC76'
-}
-API = 'https://service.narvii.com/api/v1/'
-actual_com: str | None = None
+headers: dict[str, str] = {'NDCDEVICEID': '0146BD6CF162E40F7449AFF316BA524DDDE1A1C4E6D99A553F3472EC3F4CB2F6A9ED05E5100492DC76'}
+actual_com:  str | None = None
 actual_chat: str | None = None
-bot_id = None
+bot_id:      str | None = None
+API = 'https://service.narvii.com/api/v1/'
 
 Req_json = Dict[str, Any]
 
 
-def clear():
+def clear() -> None:
     run('cls' if system() == 'Windows' else 'clear', shell=True)
 
-def exist(d: Req_json, k: str, *, in_str: bool = True):
-    try:
-        return str(d[k]) if in_str else d[k]
-    except KeyError:
-        return None
+def exist(
+    d:       Req_json,
+    k:       str,
+    convert: Any | None = None
+) -> Any | None:
 
+    with suppress(KeyError):
+        if convert:
+            tmp = convert(d[k])
+            return tmp if tmp else None
+        return d[k]
 
-def fix_ascii(s):
+def fix_ascii(s) -> str:
     return normalize('NFKD', s).encode('ASCII', 'ignore').decode().strip()
 
 
-def on_limit(obj: list[Any], limit: int) -> bool:
-    return True if limit and len(obj) >= limit else False
+def on_limit(
+    obj:   list[Any],
+    limit: int
+) -> bool:
+    return limit and len(obj) >= limit
 
 
 async def upload_media(file):
     return (
-        await req(
+        await _req(
             'post',
             '/g/s/media/upload',
-            data=await File().get(file),
+            data=await File.get(file),
             need_dumps=False,
         )
     )['mediaValue']
 
-
-async def req(
-    method: str,
-    url: str,
+async def _req(
+    method:     str,
+    url:        str,
     *,
-    data: dict[str, Any] | None = None,
-    need_dumps=True,
-    return_: str = 'json',
+    data:       dict[str, Any] | None = None,
+    need_dumps: bool                  = True,
+    return_:    str                   = 'json',
 ) -> Req_json | str | bytes:
+
     async def get_return(res):
         if return_ == 'json':
             return await res.json(loads=loads)
@@ -73,7 +81,7 @@ async def req(
             return await res.text()
         if return_ == 'file':
             return await res.read()
-        raise Exception(f'Invalid return {return_}')
+        raise Exception(f'Invalid return "{return_}"')
 
     async with request(
         method,
@@ -104,24 +112,24 @@ class Message:
     )
 
     def from_ws(self, j: Req_json) -> Message:
-        # fmt: off
         _cm: dict[str, Any] = j['chatMessage']
 
         global actual_chat, actual_com
-        self.chat: str | None = exist(_cm, 'threadId')
-        self.com:  str | None = exist(j, 'ndcId')
+        self.chat: str | None = exist(_cm, 'threadId', str)
+        self.com:  str | None = exist(j, 'ndcId', str)
 
         actual_chat = self.chat
         actual_com = self.com
 
-        self.extensions:  dict[str, Any] | None = exist(_cm, 'extensions', in_str=False)
+        self.extensions:  dict[str, Any] | None = exist(_cm, 'extensions')
         self.file_link:   str | None            = exist(_cm, 'mediaValue')
         self.has_mention: bool                  = (
                                                 True
                                                 if exist(self.extensions, 'mentionedArray')
                                                 else False
                                             )
-        self.icon:            str | None       = exist(_cm['author'], 'icon')
+
+        self.icon:            str | None       = exist(_cm['author'], 'icon') if 'author' in _cm else None
         self.id:              str | None       = exist(_cm, 'messageId')
         self.media_type:      str | None       = exist(_cm, 'mediaType')
         self.mentioned_users: list[str] | None = (
@@ -130,20 +138,18 @@ class Message:
                                                 if self.has_mention
                                                 else None
                                             )
+
         self.nickname: str | None = exist(_cm['author'], 'nickname') if 'author' in _cm else None
         self.text:     str | None = exist(_cm, 'content')
-        self.type:     str | None = exist(_cm, 'type', in_str=False)
+        self.type:     str | None = exist(_cm, 'type')
         self.uid:      str | None = exist(_cm, 'uid')
 
-    
         return self
-        # fmt: on
 
     def from_chat(self, j: Req_json) -> Message:
-        # fmt: off
-        self.author:      User | None           = User(exist(j, 'author', in_str=False))
+        self.author:      User | None           = User(exist(j, 'author'))
         self.chat:        str  | None           = exist(j, 'threadId')
-        self.extensions:  dict[str, Any] | None = exist(j, 'extensions', in_str=False)
+        self.extensions:  dict[str, Any] | None = exist(j, 'extensions')
         self.has_mention: bool                  = (
                                                 True
                                                 if exist(self.extensions, 'mentionedArray')
@@ -157,9 +163,8 @@ class Message:
                                                 else None
                                             )
         self.text: str | None = exist(j, 'content')
-        self.type: str | None = exist(j, 'type', in_str=False)
+        self.type: str | None = exist(j, 'type')
         return self
-        # fmt: on
 
     class _CreateData:
         async def msg(type_, msgs):
@@ -175,9 +180,9 @@ class Message:
                 {
                     'content': embed.msg_text,
                     'attachedObject': {
-                        'link': embed.link,
-                        'title': embed.title,
-                        'content': embed.text,
+                        'link':      embed.link,
+                        'title':     embed.title,
+                        'content':   embed.text,
                         'mediaList': embed.image,
                     },
                 }
@@ -187,10 +192,10 @@ class Message:
         self,
         *msgs: list[str],
         files: str | list[str] | None = None,
-        type_: int | None = 0,
-        embed: Embed | None = None,
-        com: str | None = None,
-        chat: str | None = None,
+        type_: int | None             = 0,
+        embed: Embed | None           = None,
+        com:   str | None             = None,
+        chat:  str | None             = None,
     ) -> list[Req_json]:
 
         com = actual_com or com
@@ -204,11 +209,11 @@ class Message:
         else:
             data = await self._CreateData.embed(embed)
 
-        async def foo(i: msgs | files | list[Embed]) -> req:
-            return await req(
+        async def foo(i: msgs | files | list[Embed]) -> _req:
+            return await _req(
                 'post',
                 f'x{com}/s/chat/thread/{chat}/message',
-                data=i,
+                data=i
             )
 
         return await gather(*[foo(i) for i in data])
@@ -246,23 +251,22 @@ class User:
     )
 
     def __init__(self, j: Req_json | None = None):
-        # fmt: off
         if j:
             self.bio             = exist(j, 'content')
-            self.blogs_count     = exist(j, 'blogsCount', in_str=False)
-            self.com             = exist(j, 'ndcId')
-            self.comments_count  = exist(j, 'commentsCount', in_str=False)
+            self.blogs_count     = exist(j, 'blogsCount')
+            self.com             = exist(j, 'ndcId', str)
+            self.comments_count  = exist(j, 'commentsCount')
             self.created_time    = exist(j, 'createdTime')
-            self.following_count = exist(j, 'membersCount')
-            self.im_following    = (True if j['followingStatus'] == 1 else False) if exist(j, 'followingStatus') else None
-            self.level           = exist(j, 'level', in_str=False)
+            self.followers_count = exist(j, 'membersCount')
+            self.following_count = exist(j, 'joinedCount')
+            self.im_following    = j['followingStatus'] == 1 if 'followingStatus' in j else None
+            self.level           = exist(j, 'level')
             self.nickname        = exist(j, 'nickname')
-            self.posts_count     = exist(j, 'postsCount', in_str=False)
+            self.posts_count     = exist(j, 'postsCount')
             self.id              = exist(j, 'uid')
-            self.reputation      = exist(j, 'reputation', in_str=False)
+            self.reputation      = exist(j, 'reputation')
             self.role            = {0: 'member', 101: 'curator', 100: 'leader', 102: 'leader-agent'}[j['role']]
-            self.visitors_count  = exist(j, 'visitoresCount', in_str=False)
-        # fmt: on
+            self.visitors_count  = exist(j, 'visitoresCount')
 
     @classmethod
     async def search(
@@ -274,7 +278,7 @@ class User:
 
         async def foo(uid: str) -> User:
             return cls(
-                (await req('get', f'x{com}/s/user-profile/{uid}'))[
+                (await _req('get', f'x{com}/s/user-profile/{uid}'))[
                     'userProfile'
                 ]
             )
@@ -286,7 +290,7 @@ class User:
         if len(reason.split()) < 3:
             raise SmallReasonForBan('Put a reason with at least three words')
 
-        return await req(
+        return await _req(
             'post',
             f'x{com}/s/user-profile/{uid}/ban',
             data={'reasonType': 200, 'note': {'content': reason}},
@@ -295,7 +299,7 @@ class User:
     async def unban(self, uid, *, reason='', com=None):
         com = com or actual_com
 
-        return await req(
+        return await _req(
             'post',
             f'x{com}/s/user-profile/{uid}/unban',
             data={'note': {'content': reason}} if reason else None,
@@ -324,76 +328,117 @@ class File:
         if type == MediaType.BYTES:
             return file
 
-        async with aiopen(file, 'rb') as a:
-            return await a.read()
+        with open(file, 'rb') as f:
+            return f.read()
 
     @staticmethod
     def b64(file_bytes: bytes) -> str:
         return b64encode(file_bytes).decode()
 
-    async def process(self, file: str) -> dict[str, Any] | NoReturn:
-        type_ = self.type_(file)
+    async def process(self, file: str | bytes) -> dict[str, Any] | NoReturn:
         if (
-            type_ not in (MediaType.LINK, MediaType.BYTES)
+            self.type_(file) not in (MediaType.LINK, MediaType.BYTES)
             and not Path(file).exists()
         ):
             raise FileNotFoundError(file)
 
-        ext = what('', file)
-        file = self.b64(await self.get(file))
+        b = await self.get(file)
 
-        if ext in ('png', 'jpeg', 'jpg', 'webp'):
-            return {
+        # python-magic using at least the first 2048 bytes,
+        # as less can produce incorrect identification
+        #
+        # https://github.com/ahupp/python-magic#usage
+        type_ = from_buffer(b[:2048], mime=True).split('/')
+
+        if type_[1] == 'gif':
+                return {
                 'mediaType': 100,
-                'mediaUploadValue': file,
-                'mediaUhqEnabled': True,
-            }
-
-        if ext in ('mp3', 'aac', 'wav', 'm4a'):
-            return {
-                'type': 2,
-                'mediaType': 110,
-                'mediaUploadValue': file,
-                'mediaUhqEnabled': True,
-            }
-
-        if ext == 'gif':
-            return {
-                'mediaType': 100,
-                'mediaUploadValue': self.b64(await self.get(file)),
+                'mediaUploadValue': self.b64(b),
                 'mediaUploadValueContentType': 'image/gif',
                 'mediaUhqEnabled': True,
             }
 
-        raise TypeError(f'Invalid file extension: {ext}')
+        if type_[0] == 'image':
+            return {
+                'mediaType': 100,
+                'mediaUploadValue': self.b64(b),
+                'mediaUhqEnabled': True,
+            }
+
+        if type_[0] == 'audio':
+            return {
+                'type': 2,
+                'mediaType': 110,
+                'mediaUploadValue': self.b64(b),
+                'mediaUhqEnabled': True,
+            }
+
+        raise InvalidFileType(file if type_ != MediaType.BYTES else '')
 
 
 class Chat:
-    __slots__ = ('id',
-                 'is_private',
-                 'name')
+    __slots__ = (
+        'announcement',
+        'bg',
+        'can_send_coins',
+        'co_hosts',
+        'creator',
+        'extensions',
+        'icon',
+        'id',
+        'is_pinned',
+        'is_private',
+        'members_can_invite',
+        'name',
+        'text',
+        'title',
+        'view_only'
+    )
 
     def __init__(self, j=None):
         if j:
-            self.id = exist(j, 'threadId')
-            self.is_private = exist(j, 'membersQuota') == 2
-            self.name = exist(j, 'title')
+            t = j['thread']
+            self.extensions         = exist(t, 'extensions')
+
+            self.announcement       = exist(self.extensions, 'announcement') or ''
+            self.bg                 = exist(self.extensions, 'bm')[1] if 'bm' in self.extensions else None
+            self.can_send_coins     = exist(t['tipInfo'], 'tippable') if 'tipInfo' in t else None
+            self.co_hosts           = exist(self.extensions, 'coHost') or []
+            self.creator            = exist(t['author'], 'uid')
+            self.icon               = exist(t, 'icon')
+            self.id                 = exist(t, 'threadId')
+            self.is_pinned          = exist(t, 'isPinned')
+            self.is_private         = exist(t, 'membersQuota') == 2
+            self.members_can_invite = exist(t, 'membersCanInvite')
+            self.name               = exist(t, 'title')
+            self.text               = '' if exist(t, 'content') in ('None', None) else exist(t, 'content')
+            self.view_only          = exist(self.extensions, 'viewOnly') or False
+
+    @classmethod
+    async def search(cls, com=None, chat=None):
+        com = actual_com or com
+        chat = actual_chat or chat
+
+        return cls(await _req(
+            'get',
+            f'x{com}/s/chat/thread/{chat}'
+        ))
 
     async def messages(
         self,
         *,
         check: Callable[[Message], bool] = lambda _: True,
-        com: str | None = None,
-        chat: str | None = None,
+        com:   str | None = None,
+        chat:  str | None = None,
         start: int | None = None,
-        end: int | None = None,
+        end:   int | None = None,
     ) -> list[Message.from_chat]:
 
         com = actual_com or com
         chat = actual_chat or chat
         messages = []
 
-        res = await req(
+        res = await _req(
             'get',
             f'x{com}/s/chat/thread/{chat}/message?v=2&pagingType=t&size=100',
         )
@@ -403,7 +448,7 @@ class Chat:
                 messages.append(msg)
 
         while True:
-            res = await req(
+            res = await _req(
                 'get',
                 f'x{com}/s/chat/thread/{chat}/message?v=2&pagingType=t&pageToken={token}&size=100',
             )
@@ -423,12 +468,12 @@ class Chat:
 
     async def clear(
         self,
-        msgs: str | list[str] | None = None,
+        msgs:  str | list[str] | None = None,
         check: Callable[[Message], bool] = lambda _: True,
-        com: str | None = None,
-        chat: str | None = None,
+        com:   str | None = None,
+        chat:  str | None = None,
         start: int | None = None,
-        end: int | None = None,
+        end:   int | None = None,
     ) -> list[Req_json]:
 
         com = actual_com or com
@@ -445,7 +490,7 @@ class Chat:
         )
 
         async def foo(msg):
-            return await req(
+            return await _req(
                 'post',
                 f'x{com}/s/chat/thread/{chat}/message/{msg}/admin',
                 data={'adminOpName': 102},
@@ -456,16 +501,16 @@ class Chat:
     async def members(
         self,
         check: Callable[[Message], bool] = lambda _: True,
-        com: str | None = None,
-        chat: str | None = None,
+        com:   str | None = None,
+        chat:  str | None = None,
         start: int | None = None,
-        end: int | None = None,
+        end:   int | None = None,
     ):
         com = actual_com or com
         chat = actual_chat or chat
 
         async def foo(i):
-            res = await req(
+            res = await _req(
                 'get',
                 f'x{com}/s/chat/thread/{chat}/member?start={i}&size=100&type=default&cv=1.2',
             )
@@ -477,7 +522,7 @@ class Chat:
                 if check(i)
             ]
 
-        members_count = (await req('get', f'x{com}/s/chat/thread/{chat}'))[
+        members_count = (await _req('get', f'x{com}/s/chat/thread/{chat}'))[
             'thread'
         ]['membersCount']
         MAX_MEMBERS_COUNT_IN_CHAT = 1000
@@ -496,7 +541,7 @@ class Chat:
         chat = [chat] if not isinstance(chat, (list, tuple)) else chat
 
         async def foo(i):
-            return await req(
+            return await _req(
                 'post', f'x{com}/s/chat/thread/{i}/member/{bot_id}'
             )
 
@@ -507,11 +552,37 @@ class Chat:
         chat = [chat] if not isinstance(chat, (list, tuple)) else chat
 
         async def foo(i):
-            return await req(
+            return await _req(
                 'delete', f'x{com}/s/chat/thread/{i}/member/{bot_id}'
             )
 
         return await gather(*[foo(i) for i in chat])
+
+    async def save(self, filename=None):
+        chat = await Chat.search()
+        info = {
+            'name': chat.name,
+            'text': chat.text,
+            'announcement': chat.announcement,
+
+            'bg': chat.bg,
+            'icon': chat.icon,
+
+            'creator': chat.creator,
+            'co-hosts': chat.co_hosts,
+
+            'can-send-coins': chat.can_send_coins,
+            'is-pinned': chat.is_pinned,
+            'only-view': chat.view_only,
+
+            'members': [i.id for i in await self.members()]
+        }
+
+        n = 0
+        while Path(f'{n}.json').exists():
+            n += 1
+        with open(filename or f'{n}.json', 'w') as f:
+            dump(info, f, indent=4, ensure_ascii=False, escape_forward_slashes=False)
 
 
 class Community:
@@ -524,7 +595,7 @@ class Community:
         com = [com] if not isinstance(com, (list, tuple)) else com
 
         async def foo(i):
-            res = await req(
+            res = await _req(
                 'get', f'x{i}/s/chat/thread?type=public-all&start=0&size=100'
             )
             return {str(i): [Chat(i) for i in res['threadList']]}
@@ -555,11 +626,11 @@ class Community:
 class My:
     @staticmethod
     async def chats(need_print=True, ignore_ascii=False):
-        res = await req('get', 'g/s/community/joined?v=1&start=0&size=50')
+        res = await _req('get', 'g/s/community/joined?v=1&start=0&size=50')
         coms = {str(i['ndcId']): [i['name'], []] for i in res['communityList']}
 
         async def foo(i):
-            return await req(
+            return await _req(
                 'get', f'x{i}/s/chat/thread?type=joined-me&start=0&size=100'
             )
 
@@ -598,7 +669,7 @@ class My:
 
     @staticmethod
     async def communities(need_print=True, ignore_ascii=False):
-        res = await req('get', f'g/s/community/joined?v=1&start=0&size=50')
+        res = await _req('get', f'g/s/community/joined?v=1&start=0&size=50')
         coms = {
             i['name']
             if not ignore_ascii
