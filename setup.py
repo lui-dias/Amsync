@@ -38,7 +38,7 @@ setup(
     setup_requires=['wheel'],
     classifiers=[
         'License :: OSI Approved :: MIT License',
-        'Operating System :: Microsoft :: Windows'
+        'Operating System :: Microsoft :: Windows',
         'Programming Language :: Python :: 3.8',
     ],
     entry_points={
