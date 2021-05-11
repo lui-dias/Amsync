@@ -369,8 +369,10 @@ async def message(m: Message):
 <br>
 
 <a id=download></a>
-### **Baixe qualquer arquivo usando o File.get**
-É bem mais simples do que criar uma função que baixe um arquivo
+### **Download any file using File.get**
+It is much simpler than creating a function that downloads a file
+
+The function returns the file bytes
 
 ```py
 from amsync import Bot, File, Message
