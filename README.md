@@ -15,7 +15,7 @@ pip install Amsync
 # Update
 
 ```
-pip install Amsync -U --force-reinstall --no-dps
+pip install Amsync -U
 ```
 Or wait a while for a message to appear in the program and it will update itself
 
@@ -36,7 +36,7 @@ async def ready():
 
 @bot.add()
 async def hello(m: Message):
-    await bot.send(m.nickname)
+    await bot.send(f'Hello {m.nickname}')
 
 bot.run()
 ```
