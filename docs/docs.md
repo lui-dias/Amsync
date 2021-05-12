@@ -456,16 +456,16 @@ async def rank(m: Message):
     pg.update(10)
     pg.add_border(2, Color.BLACK)
 
-    im.text('RANK', 'center', (135, -45), ('lato.light.ttf', 24))
-    im.text('#1', 'center', (205, -59), ('lato.medium.ttf', 52))
+    im.text('RANK', 'center', (135, -45), ('lato-light.ttf', 24))
+    im.text('#1', 'center', (205, -59), ('lato-medium.ttf', 52))
 
-    im.text('LEVEL', 'center', (300, -46), ('lato.light.ttf', 26), Color.CYAN)
-    im.text('1', 'center', (360, -59), ('lato.medium.ttf', 54), Color.CYAN)
+    im.text('LEVEL', 'center', (300, -46), ('lato-light.ttf', 26), Color.CYAN)
+    im.text('1', 'center', (360, -59), ('lato-medium.ttf', 54), Color.CYAN)
 
-    im.text(m.nickname, 'center', (-120, 15), ('lato.medium.ttf', 32))
+    im.text(m.nickname, 'center', (-120, 15), ('lato-medium.ttf', 32))
 
-    im.text('5', 'right', (-170, 15), ('lato.medium.ttf', 26))
-    im.text('/ 100 XP', 'right', (-55, 15), ('lato.medium.ttf', 26), Color.GRAY)
+    im.text('5', 'right', (-170, 15), ('lato-medium.ttf', 26))
+    im.text('/ 100 XP', 'right', (-55, 15), ('lato-medium.ttf', 26), Color.GRAY)
     
     im.paste(icon, 'left', (50, 0))
     im.paste(pg, 'center', (115, 60))
@@ -599,10 +599,10 @@ We added a text with:
 * Content **RANK**
 * Positioned in the **center** of the background image
 * Moving **135px to right** and **45px to top**
-* With the font **lato.light.ttf** of size **24px**
+* With the font **lato-light.ttf** of size **24px**
 * By default the text color is **Color.WHITE**
 ```py
-im.text('RANK', 'center', (135, -45), ('lato.light.ttf', 24))
+im.text('RANK', 'center', (135, -45), ('lato-light.ttf', 24))
 ```
 ![](imgs/text.webp)
 <br>
@@ -611,7 +611,7 @@ im.text('RANK', 'center', (135, -45), ('lato.light.ttf', 24))
 
 The same thing said above applies here, but here the text color is **cyan**
 ```py
-im.text('LEVEL', 'center', (300, -46), ('lato.light.ttf', 26), Color.CYAN)
+im.text('LEVEL', 'center', (300, -46), ('lato-light.ttf', 26), Color.CYAN)
 ```
 ![](imgs/text-color.webp)
 <br>
@@ -621,7 +621,7 @@ im.text('LEVEL', 'center', (300, -46), ('lato.light.ttf', 26), Color.CYAN)
 
 Here the text will be the **name of the user** who sent the message
 ```py
-im.text(m.nickname, 'center', (-120, 15), ('lato.medium.ttf', 32))
+im.text(m.nickname, 'center', (-120, 15), ('lato-medium.ttf', 32))
 ```
 ![](imgs/text-nick.webp)
 <br>
