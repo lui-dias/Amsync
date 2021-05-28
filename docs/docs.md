@@ -33,7 +33,7 @@
 # Minimal example<a id=examples></a>
 ![](gifs/minimal.gif)
 ```py
-from amsync import Bot, WsMsg
+from amsync import Bot, Msg
 
 
 bot = Bot('email', 'password', prefix='/')
@@ -43,19 +43,19 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def hi(m: WsMsg):
+async def hi(m: Msg):
     await bot.send(f'Hi {m.nickname}')
 
 bot.run()
 ```
 \
 \
-**NOTE:** It is not necessary to import **`WsMsg`**, however by setting the type of the function parameter to **`WsMsg`** (as done in the **`hi`** function), it allows the IDE to display the values of the parameters, see [recommendation](#use-typing)
+**NOTE:** It is not necessary to import **`Msg`**, however by setting the type of the function parameter to **`Msg`** (as done in the **`hi`** function), it allows the IDE to display the values of the parameters, see [recommendation](#use-typing)
 \
 \
 Imports the required classes
 ```py
-from amsync import Bot, WsMsg
+from amsync import Bot, Msg
 ```
 \
 \
@@ -97,14 +97,14 @@ Creates a command
 ```
 \
 \
-**NOTE:** All commands receive the class **`WsMsg`** as a parameter
+**NOTE:** All commands receive the class **`Msg`** as a parameter
 \
-**NOTE:** As [said](#use-typing), it is optional to set the parameter type to **`WsMsg`**, but I personally recommend
+**NOTE:** As [said](#use-typing), it is optional to set the parameter type to **`Msg`**, but I personally recommend
 \
 \
 Insert the **command name** in the **function name**
 ```py
-async def hi(m: WsMsg):
+async def hi(m: Msg):
 ```
 \
 \
@@ -117,7 +117,7 @@ await bot.send(m.nickname)
 We created the command **hi** that sends the **nickname** of the person who called the command
 ```py
 @bot.add()
-async def hi(m: WsMsg):
+async def hi(m: Msg):
     await bot.send(m.nickname)
 ```
 \
@@ -132,7 +132,7 @@ bot.run()
 # Send files<a id=files></a>
 ![](gifs/send-image.gif)
 ```py
-from amsync import Bot, WsMsg
+from amsync import Bot, Msg
 
 
 bot = Bot('email', 'password')
@@ -142,7 +142,7 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def gif(m: WsMsg):
+async def gif(m: Msg):
     img='https://cdn.pixabay.com/photo/2015/04/23/22/00/tree-736885__340.jpg'
     await bot.send(files=img)
 
@@ -189,7 +189,7 @@ await bot.send(files=['image.png', 'gif.gif', 'audio.mp3'])
 # Wait for a message<a id=wait></a>
 ![](gifs/wait.gif)
 ```py
-from amsync import Bot, WsMsg
+from amsync import Bot, Msg
 
 
 bot = Bot('email', 'password')
@@ -199,8 +199,8 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def wait(m: WsMsg):
-    def check(_m: WsMsg):
+async def wait(m: Msg):
+    def check(_m: Msg):
         return _m.text == 'Hi'
 
     await bot.send('Say Hi')
@@ -213,14 +213,14 @@ bot.run()
 \
 We check if the message text is "Hi"
 ```py
-def check(_m: WsMsg):
+def check(_m: Msg):
     return _m.text == 'Hi'
 ```
 \
 \
 **Pause the command** until the condition (check) is met
 \
-**`bot.wait_for`** returns **`WsMsg`** (the same **`WsMsg`** that **`check`** received)
+**`bot.wait_for`** returns **`Msg`** (the same **`Msg`** that **`check`** received)
 ```py
 await bot.wait_for(check=check)
 ```
@@ -238,7 +238,7 @@ await bot.wait_for(check=check, timeout=10)
 # Send embed<a id=embed></a>
 ![](gifs/embed.gif)
 ```py
-from amsync import Bot, WsMsg, Embed
+from amsync import Bot, Msg, Embed
 
 
 bot = Bot('email', 'password')
@@ -248,7 +248,7 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def embed(m: WsMsg):
+async def embed(m: Msg):
     embed = Embed(
         msg_text='msg_text',
         title='title',
@@ -302,8 +302,8 @@ PASSWORD=YOUR_PASSWORD
 <br>
 
 <a id=use-typing></a>
-### **Define the type of the parameter in the functions that receive `WsMsg` as a parameter**
-It saves a lot of time, as **allows the IDE to display the values of `WsMsg`** instead of you manually viewing the file where **`WsMsg`** is.
+### **Define the type of the parameter in the functions that receive `Msg` as a parameter**
+It saves a lot of time, as **allows the IDE to display the values of `Msg`** instead of you manually viewing the file where **`Msg`** is.
 
 **Wrong**
 
@@ -325,7 +325,7 @@ Otherwise it will create an infinite loop of messages
 ![](gifs/no-ignore-bot.gif)
 ```py
 @bot.on()
-async def message(m: WsMsg):
+async def message(m: Msg):
     await bot.send(f'Hi {m.nickname}')
 ```
 \
@@ -335,7 +335,7 @@ async def message(m: WsMsg):
 ![](gifs/with-ignore-bot.gif)
 ```py
 @bot.on()
-async def message(m: WsMsg):
+async def message(m: Msg):
     if m.uid != bot.id:
         await bot.send(f'Hi {m.nickname}')
 ```
@@ -349,12 +349,12 @@ It is much simpler than creating a function that downloads a file
 The function returns the file bytes
 
 ```py
-from amsync import Bot, File, WsMsg
+from amsync import Bot, File, Msg
 
 ...
 
 @bot.add()
-async def ico(m: WsMsg):
+async def ico(m: Msg):
     icon = await File.get(m.icon)
     await bot.send(icon)
 ...
@@ -403,7 +403,7 @@ Literally any potato can create an image
 
 ![](gifs/rank-card.gif)
 ```py
-from amsync import Bot, MakeImage, Color, WsMsg, File, ProgressBar
+from amsync import Bot, MakeImage, Color, Msg, File, ProgressBar
 
 
 bot = Bot()
@@ -414,7 +414,7 @@ async def ready():
 
 
 @bot.add()
-async def rank(m: WsMsg):
+async def rank(m: Msg):
     im = MakeImage.new((934, 282), Color.PRETTY_BLACK)
     ico = await File.get(m.icon)
 
@@ -652,8 +652,8 @@ from amsync import Bot, Chat
 bot = Bot()
 
 @bot.add()
-async def test(m: WsMsg):
-    def check(_m: WsMsg):
+async def test(m: Msg):
+    def check(_m: Msg):
         return _m.type == 100
 
     await Chat.messages(check=check)
@@ -675,7 +675,7 @@ As in **[Bot.wait_for](#wait)** we can use a function to get a message that meet
 \
 Checks if the message has a type of 100
 ```py
-def check(_m: WsMsg):
+def check(_m: Msg):
     return _m.type == 100
 ```
 \
@@ -706,8 +706,8 @@ from amsync import Bot, Chat
 bot = Bot()
 
 @bot.add()
-async def test(m: WsMsg):
-    def check(_m: WsMsg):
+async def test(m: Msg):
+    def check(_m: Msg):
         return _m.type == 100
 
     await Chat.clear(check=check)
@@ -744,7 +744,7 @@ from amsync import Bot, Chat, User
 bot = Bot()
 
 @bot.add()
-async def test(m: WsMsg):
+async def test(m: Msg):
     def check(_m: User):
         return _m.level > 8
 
@@ -754,7 +754,7 @@ bot.run()
 ```
 Everything that was said in **[Chat.messages](#Chat.messages)** applies in **`Chat.members`**.
 \
-But **`check`** receives **`User`** instead of **`WsMsg`** and **it doesn’t take long to get users**
+But **`check`** receives **`User`** instead of **`Msg`** and **it doesn’t take long to get users**
 <br>
 <br>
 <br>
@@ -768,7 +768,7 @@ from amsync import Bot, Chat
 bot = Bot()
 
 @bot.add()
-async def test(m: WsMsg):
+async def test(m: Msg):
     await Chat.join('chat_id')
 
 bot.run()
@@ -800,7 +800,7 @@ from amsync import Bot, Chat
 bot = Bot()
 
 @bot.add()
-async def test(m: WsMsg):
+async def test(m: Msg):
     await Chat.leave('chat_id')
 
 bot.run()
@@ -819,7 +819,7 @@ Everything said in [Chat.join](#Chat.join) applies here
 ## **User.search**
 On some occasions, the amino does not show all information about the user, so we can use this function to obtain the user's information
 ```py
-from amsync import Bot, WsMsg, User
+from amsync import Bot, Msg, User
 
 
 bot = Bot()
@@ -829,7 +829,7 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def level(m: WsMsg):
+async def level(m: Msg):
     level = (await User.search(m.uid)).level
     await bot.send(f'Level: {level}')
 
@@ -864,7 +864,7 @@ await User.search(['uid', 'uid', 'uid'])
 Ban a person
 ```py
 @bot.add()
-async def ban(m: WsMsg):
+async def ban(m: Msg):
     if m.mentioned_users:
         uid = m.mentioned_users[0]
         nickname = (await user.search(uid)).nickname
@@ -881,7 +881,7 @@ if m.mentioned_users:
 \
 \
 \
-**NOTE: `WsMsg.mentioned_users`** returns a list containing the uids of the mentioned users
+**NOTE: `Msg.mentioned_users`** returns a list containing the uids of the mentioned users
 
 Get nickname
 ```py
@@ -902,7 +902,7 @@ await bot.send(f'{nickname} banned')
 ## **User.unban**
 ```py
 @bot.add()
-async def unban(m: WsMsg):
+async def unban(m: Msg):
     if m.mentioned_users:
         uid = m.mentioned_users[0]
         nickname = (await User.search(uid)).nickname
@@ -983,7 +983,7 @@ Everything said in [My.chats](#My.chats) applies here
 ## **Community.chats**
 Shows all public chats in a community
 ```py
-from amsync import Bot, WsMsg, Community
+from amsync import Bot, Msg, Community
 
 bot = Bot()
 
@@ -992,7 +992,7 @@ async def ready():
     print('Ready')
 
 @bot.on()
-async def message(m: WsMsg):
+async def message(m: Msg):
     await Community.chats(need_print=True, ignore_ascii=True)
 
 bot.run()

@@ -15,7 +15,7 @@ pip install Amsync
 # Minimal example
 
 ```py
-from amsync import Bot, WsMsg
+from amsync import Bot, Msg
 
 
 bot = Bot('email', 'password', prefix='/')
@@ -25,7 +25,7 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def hello(m: WsMsg):
+async def hello(m: Msg):
     await bot.send(f'Hello {m.nickname}')
 
 bot.run()

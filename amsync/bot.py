@@ -30,7 +30,7 @@ from .ws import Ws
 from .db import DB
 from .obj import Message, Req
 from .utils import Slots, clear
-from .dataclass import WsMsg, Embed, Res
+from .dataclass import Msg, Embed, Res
 from .exceptions import (
     AccountNotFoundInDotenv,
     EventIsntAsync,
@@ -40,7 +40,9 @@ from .exceptions import (
     InvalidEvent
 )
 
-Coro_return_ws_msg = Callable[[], Coroutine[WsMsg, None, None]]
+__all__ = ['Bot']
+
+Coro_return_ws_msg = Callable[[], Coroutine[Msg, None, None]]
 Coro_return_Any    = Callable[[], Coroutine[Any, None, None]]
 Coro_return_None   = Callable[[], Coroutine[None, None, None]]
 
@@ -130,7 +132,7 @@ class Bot(Slots):
 
         ```
         @bot.add()
-        async def hi(m: WsMsg):
+        async def hi(m: Msg):
             await bot.send(f'Hi, {m.nickname}')
         ```
 
@@ -153,7 +155,7 @@ class Bot(Slots):
 
         ```
         @bot.on()
-        async def message(m: WsMsg):
+        async def message(m: Msg):
             print(m.text)
         ```
 
@@ -270,7 +272,7 @@ class Bot(Slots):
 
     async def wait_for(
         self,
-        check:   Callable[[WsMsg], bool] = lambda _: True,
+        check:   Callable[[Msg], bool] = lambda _: True,
         timeout: int | None              = None
     ) -> Awaitable[Future, int | None] | None:
         """
@@ -279,7 +281,7 @@ class Bot(Slots):
         If the condition is met, the message returns, if not returns None
 
         ```
-        def check(_m: WsMsg):
+        def check(_m: Msg):
             return _m.text == 'Hello'
 
         await bot.wait_for(check=check, timeout=10)

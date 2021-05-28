@@ -15,7 +15,7 @@ from .db import DB
 from .obj import Message, _req
 from .enum import WsStatus
 from .utils import Slots, clear
-from .dataclass import WsMsg
+from .dataclass import Msg
 
 
 class Ws(Slots):
@@ -56,7 +56,7 @@ class Ws(Slots):
             'deviceID': self._deviceid,
         })).json['sid']
 
-    async def _connect(self) -> AsyncIterator[WsMsg]:
+    async def _connect(self) -> AsyncIterator[Msg]:
         """
         Connect the websocket
         """
@@ -99,7 +99,7 @@ class Ws(Slots):
     def _call_events(
         self,
         name: str,
-        *m: list[WsMsg]
+        *m: list[Msg]
     ) -> None:
         """
         Calls all events with the specific name
@@ -118,7 +118,7 @@ class Ws(Slots):
         # Add = until sid has the len of 192 or len % 4 == 0 solve the problem
         return sid + '=' * (192 - len(sid))
 
-    def _can_call(self, msg: WsMsg) -> Literal[True] | None:
+    def _can_call(self, msg: Msg) -> Literal[True] | None:
         if not self._only_chats and not self._ignore_chats:
             return True
 

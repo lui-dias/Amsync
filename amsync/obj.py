@@ -28,7 +28,7 @@ from .utils import (
 from .dataclass import (
     Res,
     Reply,
-    WsMsg,
+    Msg,
     ChatMsg,
     Embed,
     DataUser,
@@ -39,6 +39,15 @@ from .exceptions import (
     SmallReasonForBan,
     AminoSays
 )
+
+__all__ = [
+    'Req',
+    'User',
+    'File',
+    'Chat',
+    'Community',
+    'My'
+]
 
 ignore_codes = [
     1628 # Sorry, you cannot pick this member.. | Chat.config
@@ -148,9 +157,9 @@ async def upload_chat_icon(file: str) -> str:
 
 
 class Message:
-    def from_ws(self, j: Dict[str, Any]) -> WsMsg:
+    def from_ws(self, j: Dict[str, Any]) -> Msg:
         """
-        Returns a WsMsg containing the information from the websocket message
+        Returns a Msg containing the information from the websocket message
         
         Update actual_com and actual_chat with the chat and community of the message received
         """
@@ -160,7 +169,7 @@ class Message:
         actual_chat = get_value(j, 'chatMessage', 'threadId', convert=str)
         actual_com  = get_value(j, 'ndcId', convert=str)
 
-        return WsMsg._make(j)
+        return Msg._make(j)
 
     def from_chat(self, j: Dict[str, Any]) -> ChatMsg:
         """

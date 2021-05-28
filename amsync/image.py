@@ -6,6 +6,13 @@ from typing import Tuple
 from pathlib import Path
 from filetype import guess_mime
 
+
+__all__ = [
+    'Color',
+    'MakeImage',
+    'ProgressBar'
+]
+
 Size = Tuple[int, int]
 RGBA = Tuple[int, int, int, int]
 

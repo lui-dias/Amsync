@@ -7,6 +7,15 @@ from ujson import loads
 
 from .utils import Slots, get_value
 
+__all__ = [
+    'Res',
+    'Reply',
+    'Msg',
+    'ChatMsg',
+    'Embed',
+    'DataUser',
+    'DataChat'
+]
 
 @dataclass
 class Res(Slots):
@@ -46,7 +55,7 @@ class Reply(Slots):
     uid:      str | None
 
 @dataclass
-class WsMsg(Slots):
+class Msg(Slots):
     """
     Represents a websocket message
     """
@@ -68,7 +77,7 @@ class WsMsg(Slots):
     uid:             str | None
 
     @classmethod
-    def _make(cls, j) -> WsMsg:
+    def _make(cls, j) -> Msg:
         cm:  dict[str, Any] = j['chatMessage']
         ext: dict[str, Any] = get_value(cm, 'extensions') or {}
 
