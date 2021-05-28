@@ -1,8 +1,13 @@
+from __future__ import annotations
+
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-from magic import from_buffer
+from typing import Tuple
 from pathlib import Path
+from filetype import guess_mime
 
+Size = Tuple[int, int]
+RGBA = Tuple[int, int, int, int]
 
 class Color:
     RED    = (255, 0, 0, 255)
@@ -24,68 +29,91 @@ class Color:
 
 
 class MakeImage:
-    def __init__(self, img):
+    def __init__(self, img) -> None:
+        if isinstance(img, bytes):
+            img = Image.open(BytesIO(img))
+
         self.img: Image.Image = img
 
     @property
-    def size(self):
+    def size(self) -> tuple(int, int):
         return self.img.size
 
     @property
-    def bytes(self):
+    def bytes(self) -> bytes:
         arr = BytesIO()
         self.save(arr)
         return arr.getvalue()
 
     @staticmethod
-    def type(b):
-        return from_buffer(b[:2048]).split('/')[1]
+    def type(b) -> str:
+        # Only first 261 bytes representing the max file header is required
+        #
+        # https://github.com/h2non/filetype.py#features
+        return guess_mime(b[:261]).split('/')[1]
 
     @classmethod
-    def new(cls, size, color=Color.WHITE):
+    def new(
+        cls,
+        size: Size,
+        color: RGBA | Color = Color.WHITE
+    ) -> MakeImage:
         return cls(Image.new('RGBA', size, color))
 
     @classmethod
-    def open(cls, path):
+    def from_path(cls, path) -> MakeImage:
         return cls(Image.open(path))
 
     @classmethod
-    def from_bytes(cls, b):
-        return cls(Image.open(BytesIO(b)))
-
-    @classmethod
-    def convert(cls, im):
+    def convert(cls, im: Image.Image) -> MakeImage:
         return cls(im)
 
-    def get_text_pos(self, draw, text, font):
+    def get_text_pos(
+        self,
+        draw: ImageDraw.Draw,
+        text: str,
+        font: ImageFont.truetype
+    ) -> Size:
+
         w, h = draw.textsize(text, font=font)
         W, H = self.size
         return W-w, H-h
 
-    def get_image_pos(self, im):
+    def get_image_pos(self, im: Image.Image) -> Size:
         W, H = self.size
         w, h = im.size
         return W-w, H-h
 
-    def resize(self, size, preserve_aspect=False):
+    def resize(
+        self,
+        size:            Size,
+        preserve_aspect: bool = False
+    ) -> None:
+
         if preserve_aspect:
             self.img.thumbnail(size, Image.BICUBIC)
         else:
             self.img = self.img.resize(size, Image.BICUBIC)
 
-    def crop(self, size):
-        W, H = self.size
+    def crop(self, size: Size) -> None:
+        W, H   = self.size
         cw, ch = W//2, H//2
-        w, h = size
+        w, h   = size
 
-        left = cw-w//2
-        top = ch-h//2
-        right = cw + w//2
+        left   = cw - w//2
+        top    = ch - h//2
+        right  = cw + w//2
         bottom = ch + h//2
 
         self.img = self.img.crop((left, top, right, bottom))
 
-    def save(self, path, format='webp', quality=None):
+    def save(
+        self,
+        path:    str,
+        format:  str        = 'webp',
+        quality: int | None = None
+    ) -> None:
+
         format = format.lower()
         if format in ('jpg', 'jpeg', 'png'):
             self.img.save(path, format, quality=quality or 80)
@@ -95,7 +123,12 @@ class MakeImage:
             self.img.save(path, format, quality=quality)
 
     @staticmethod
-    def calc(size, position=None, move=(0, 0)):
+    def calc(
+        size:     Size, 
+        position: str | None = None, 
+        move:     Size       = (0, 0)
+    ) -> Size:
+
         w, h = size
         if position == 'center':
             return tuple(map(sum, zip((w//2, h//2), move)))
@@ -111,14 +144,15 @@ class MakeImage:
 
     def text(
         self,
-        text,
-        position=None,
-        move=(0, 0),
-        font=None,
-        color=Color.WHITE,
-        stroke=0,
-        stroke_color=Color.BLACK,
-    ):
+        text:         str,
+        position:     str | None   = None,
+        move:         Size         = (0, 0),
+        font:         str | None   = None,
+        color:        RGBA | Color = Color.WHITE,
+        stroke:       int          = 0,
+        stroke_color: RGBA | Color = Color.BLACK,
+    ) -> None:
+
         draw = ImageDraw.Draw(self.img)
         if font:
             if not font[0] or not font[1]:
@@ -129,20 +163,27 @@ class MakeImage:
         draw.text(
             self.calc((w, h), move=move, position=position),
             text,
-            font=font,
-            fill=color,
-            stroke_width=stroke,
-            stroke_fill=stroke_color,
+            font         = font,
+            fill         = color,
+            stroke_width = stroke,
+            stroke_fill  = stroke_color,
         )
 
-    def paste(self, im, position=None, move=(0, 0)):
+    def paste(
+        self,
+        im:       MakeImage | Image.Image,
+        position: str | None               = None,
+        move:     Size                     = (0, 0)
+    ) -> None:
+
         if isinstance(im, MakeImage):
             im = im.img
+            
         self.img.paste(
             im, self.calc(self.get_image_pos(im), position, move), im
         )
 
-    def circular_thumbnail(self):
+    def circular_thumbnail(self) -> None:
         w, h = self.size
         w, h = w*3, h*3
         mask = Image.new('L', (w, h), 0)
@@ -154,7 +195,7 @@ class MakeImage:
         self.img = ImageOps.fit(self.img, mask.size, Image.BICUBIC)
         self.img.putalpha(mask)
 
-    def to_img(self, n_frame=0):
+    def to_img(self, n_frame: int = 0) -> MakeImage:
         self.img.seek(n_frame)
         self.save('tmp.webp')
         with open('tmp.webp', 'rb') as tmp:
@@ -162,8 +203,12 @@ class MakeImage:
         Path('tmp.webp').unlink(missing_ok=True)
         return tmp
 
-    def add_border(self, size, color=Color.WHITE):
-        # The border size must be an even number
+    def add_border(
+        self,
+        size:  Size, 
+        color: RGBA | Color = Color.WHITE
+    ) -> None:
+
         W, H = self.size
 
         mask = self.img.copy().resize((W + size*2, H + size*2))
@@ -177,25 +222,29 @@ class MakeImage:
 
         self.img = bg
 
-    def show(self):
+    def show(self) -> None:
         self.img.show()
 
 
 class ProgressBar(MakeImage):
     def __init__(
-        self, size, radius=30, color=Color.WHITE, bg_color=Color.PRETTY_BLACK
+        self,
+        size:     Size, 
+        radius:   int          = 30, 
+        color:    RGBA | Color = Color.WHITE, 
+        bg_color: RGBA | Color = Color.PRETTY_BLACK
     ):
-        w, h = size
-        self.img = Image.new('RGBA', (w, h), Color.TRANSPARENT)
+    
+        self.img = Image.new('RGBA', size, Color.TRANSPARENT)
         self.radius = radius
         self.color = color
         self.bg = bg_color
 
         ImageDraw.Draw(self.img).rounded_rectangle(
-            (0, 0, w, h), radius, bg_color
+            (0, 0, *size), radius, bg_color
         )
 
-    def update(self, px):
+    def fill(self, px: int) -> None:
         w, h = self.img.size
 
         bg_fill = self.img.copy()

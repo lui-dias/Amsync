@@ -1,179 +1,207 @@
 from __future__ import annotations
 
-from typing import Any, Callable, NoReturn, Dict
+from uuid import uuid4
+from typing import (
+    Any,
+    Callable,
+    Literal,
+    NoReturn,
+    Dict
+)
 from pathlib import Path
 from asyncio import gather
-from platform import system
-from subprocess import run
-from contextlib import suppress
-from unicodedata import normalize
 
-from magic import from_buffer
-from ujson import dumps, loads, dump
+from ujson import dumps, dump, load
 from aiohttp import request
+from filetype import guess_mime
 from pybase64 import b64encode
 
 from .enum import MediaType
+from .utils import (
+    get_value,
+    words,
+    on_limit,
+    fix_ascii,
+    to_list,
+    one_or_list
+)
+from .dataclass import (
+    Res,
+    Reply,
+    WsMsg,
+    ChatMsg,
+    Embed,
+    DataUser,
+    DataChat
+)
 from .exceptions import (
+    EmptyCom,
     SmallReasonForBan,
-    InvalidFileType
+    AminoSays
 )
 
-
-headers: dict[str, str] = {'NDCDEVICEID': '0146BD6CF162E40F7449AFF316BA524DDDE1A1C4E6D99A553F3472EC3F4CB2F6A9ED05E5100492DC76'}
+ignore_codes = [
+    1628 # Sorry, you cannot pick this member.. | Chat.config
+]
+headers: dict[str, str] = {'NDCDEVICEID': '0184a516841ba77a5b4648de2cd0dfcb30ea46dbb4e911a6ed122578b14c7b662c59f9a2c83101f5a1'}
 actual_com:  str | None = None
 actual_chat: str | None = None
 bot_id:      str | None = None
 API = 'https://service.narvii.com/api/v1/'
 
-Req_json = Dict[str, Any]
 
+class Req:
+    async def new(
+        method:  str,
+        url:     str,
+        **kwargs
+    ) -> Res:
+        """
+        Create a request
 
-def clear() -> None:
-    run('cls' if system() == 'Windows' else 'clear', shell=True)
+        **kwargs are the extra arguments of aiohttp.request
+        """
 
-def exist(
-    d:       Req_json,
-    k:       str,
-    convert: Any | None = None
-) -> Any | None:
-
-    with suppress(KeyError):
-        if convert:
-            tmp = convert(d[k])
-            return tmp if tmp else None
-        return d[k]
-
-def fix_ascii(s) -> str:
-    return normalize('NFKD', s).encode('ASCII', 'ignore').decode().strip()
-
-
-def on_limit(
-    obj:   list[Any],
-    limit: int
-) -> bool:
-    return limit and len(obj) >= limit
-
-
-async def upload_media(file):
-    return (
-        await _req(
-            'post',
-            '/g/s/media/upload',
-            data=await File.get(file),
-            need_dumps=False,
-        )
-    )['mediaValue']
+        async with request(
+            method  = method,
+            url     = url,
+            **kwargs
+        ) as res:
+            return await Res._make(res)
 
 async def _req(
     method:     str,
     url:        str,
-    *,
     data:       dict[str, Any] | None = None,
-    need_dumps: bool                  = True,
-    return_:    str                   = 'json',
-) -> Req_json | str | bytes:
+    need_dumps: bool                  = True
+) -> Res:
+    """
+    Create a request for the amino api
 
-    async def get_return(res):
-        if return_ == 'json':
-            return await res.json(loads=loads)
-        if return_ == 'text':
-            return await res.text()
-        if return_ == 'file':
-            return await res.read()
-        raise Exception(f'Invalid return "{return_}"')
+    Headers are automatically inserted into the request
 
-    async with request(
-        method,
-        API + url,
-        data=dumps(data) if need_dumps else data,
-        headers=headers,
-        raise_for_status=True,
-    ) as _req:
-        return await get_return(_req)
+    #### need_dumps
+    If need use ujson.dumps on the data
+    """
+
+    res = await Req.new(
+        method  = method,
+        url     = API + url,
+        data    = dumps(data) if need_dumps else data,
+        headers = headers
+    )
+
+    api_status_code = res.json['api:statuscode']
+
+    if not res.ok and api_status_code and api_status_code not in ignore_codes:
+        raise AminoSays(f"{res.json['api:message']}. Code: {api_status_code}")
+    return res
+
+
+async def upload_media(file: str) -> str:
+    """
+    Send a file to be used when posting a blog
+
+    Returns the file link
+    """
+
+    return (
+        await _req(
+            'post',
+            '/g/s/media/upload',
+            await File.get(file),
+            False,
+        )
+    ).json['mediaValue']
+
+async def upload_chat_bg(file: str) -> str:
+    """
+    Send a file to be used as chat background
+
+    Returns the file link
+    """
+
+    return (
+        await _req(
+            'post',
+            'g/s/media/upload/target/chat-background',
+            await File.get(file),
+            False,
+        )
+    ).json['mediaValue']
+
+async def upload_chat_icon(file: str) -> str:
+    """
+    Send a file to be used as chat icon
+
+    Returns the file link
+    """
+
+    return (
+        await _req(
+            'post',
+            'g/s/media/upload/target/chat-cover',
+            await File.get(file),
+            False,
+        )
+    ).json['mediaValue']
 
 
 class Message:
-    __slots__ = (
-        'author',
-        'chat',
-        'com',
-        'extensions',
-        'file_link',
-        'has_mention',
-        'icon',
-        'id',
-        'media_type',
-        'mentioned_users',
-        'nickname',
-        'text',
-        'type',
-        'uid',
-    )
-
-    def from_ws(self, j: Req_json) -> Message:
-        _cm: dict[str, Any] = j['chatMessage']
+    def from_ws(self, j: Dict[str, Any]) -> WsMsg:
+        """
+        Returns a WsMsg containing the information from the websocket message
+        
+        Update actual_com and actual_chat with the chat and community of the message received
+        """
 
         global actual_chat, actual_com
-        self.chat: str | None = exist(_cm, 'threadId', str)
-        self.com:  str | None = exist(j, 'ndcId', str)
 
-        actual_chat = self.chat
-        actual_com = self.com
+        actual_chat = get_value(j, 'chatMessage', 'threadId', convert=str)
+        actual_com  = get_value(j, 'ndcId', convert=str)
 
-        self.extensions:  dict[str, Any] | None = exist(_cm, 'extensions')
-        self.file_link:   str | None            = exist(_cm, 'mediaValue')
-        self.has_mention: bool                  = (
-                                                True
-                                                if exist(self.extensions, 'mentionedArray')
-                                                else False
-                                            )
+        return WsMsg._make(j)
 
-        self.icon:            str | None       = exist(_cm['author'], 'icon') if 'author' in _cm else None
-        self.id:              str | None       = exist(_cm, 'messageId')
-        self.media_type:      str | None       = exist(_cm, 'mediaType')
-        self.mentioned_users: list[str] | None = (
-                                                [u['uid']
-                                                for u in self.extensions['mentionedArray']]
-                                                if self.has_mention
-                                                else None
-                                            )
+    def from_chat(self, j: Dict[str, Any]) -> ChatMsg:
+        """
+        Returns a ChatMsg containing information from Chat.messages messages
+        """
 
-        self.nickname: str | None = exist(_cm['author'], 'nickname') if 'author' in _cm else None
-        self.text:     str | None = exist(_cm, 'content')
-        self.type:     str | None = exist(_cm, 'type')
-        self.uid:      str | None = exist(_cm, 'uid')
-
-        return self
-
-    def from_chat(self, j: Req_json) -> Message:
-        self.author:      User | None           = User(exist(j, 'author'))
-        self.chat:        str  | None           = exist(j, 'threadId')
-        self.extensions:  dict[str, Any] | None = exist(j, 'extensions')
-        self.has_mention: bool                  = (
-                                                True
-                                                if exist(self.extensions, 'mentionedArray')
-                                                else False
-                                            )
-        self.id:              str | None        = exist(j, 'messageId')
-        self.mentioned_users: list[str] | None  = (
-                                                [u['uid']
-                                                for u in j['extensions']['mentionedArray']]
-                                                if self.has_mention
-                                                else None
-                                            )
-        self.text: str | None = exist(j, 'content')
-        self.type: str | None = exist(j, 'type')
-        return self
+        return ChatMsg._make(j)
 
     class _CreateData:
-        async def msg(type_, msgs):
-            return [{'type': type_, 'content': i} for i in msgs]
+        """
+        Stores methods for creating Message.send data
+        """
 
-        async def file(files):
-            return [await File().process(i) for i in files]
+        async def msg(
+            type:  int,
+            msgs:  list[str],
+            reply: Reply
+        ) -> list[Dict[str, Any]]:
+            """
+            Creates the data for sending a message
+            """
 
-        async def embed(embed: Embed):
+            return [
+                {'type': type, 'content': i, 'replyMessageId': reply}
+                if reply
+                else {'type': type, 'content': i}
+                for i in msgs
+            ]
+
+        async def file(files: list[str | bytes]) -> list[Dict[str, Any]]:
+            """
+            Creates the data for sending a file
+            """
+
+            return [await File.process(i) for i in files]
+
+        async def embed(embed: Embed) -> list[Dict[str, Any]]:
+            """
+            Creates the data for sending a embed
+            """
+
             if embed.image:
                 embed.image = [[100, await upload_media(embed.image), None]]
             return [
@@ -191,124 +219,105 @@ class Message:
     async def send(
         self,
         *msgs: list[str],
-        files: str | list[str] | None = None,
-        type_: int | None             = 0,
-        embed: Embed | None           = None,
-        com:   str | None             = None,
-        chat:  str | None             = None,
-    ) -> list[Req_json]:
+        files: str   | list[str] | None = None,
+        type_: int   | None             = 0,
+        embed: Embed | None             = None,
+        reply: str   | None             = None,
+        com:   str   | None             = None,
+        chat:  str   | None             = None,
+    ) -> Res | list[Res]:
+        """
+        Send a message, file, embed or reply
 
-        com = actual_com or com
-        chat = actual_chat or chat
-        files = [files] if files and not isinstance(files, (tuple, list)) else files
+        #### reply
+
+        Message id to reply
+        """
+
+        com   = com or actual_com
+        chat  = chat or actual_chat
+        files = to_list(files)
 
         if msgs:
-            data = await self._CreateData.msg(type_, msgs)
+            data = await self._CreateData.msg(type_, msgs, reply)
         elif files:
             data = await self._CreateData.file(files)
         else:
             data = await self._CreateData.embed(embed)
 
-        async def foo(i: msgs | files | list[Embed]) -> _req:
+        async def foo(i) -> Res:
             return await _req(
                 'post',
                 f'x{com}/s/chat/thread/{chat}/message',
                 data=i
             )
 
-        return await gather(*[foo(i) for i in data])
-
-
-class Embed:
-    __slots__ = ('msg_text', 'title', 'text', 'link', 'image')
-
-    def __init__(self, msg_text, title, text, link, image=None):
-        self.msg_text = msg_text
-        self.title = title
-        self.text = text
-        self.link = link
-        self.image = image
+        return one_or_list(await gather(*[foo(i) for i in data]))
 
 
 class User:
-    __slots__ = (
-        'bio',
-        'blogs_count',
-        'com',
-        'comments_count',
-        'created_time',
-        'followers_count',
-        'following_count',
-        'id',
-        'im_following',
-        'is_online',
-        'level',
-        'nickname',
-        'posts_count',
-        'reputation',
-        'role',
-        'visitors_count',
-    )
-
-    def __init__(self, j: Req_json | None = None):
-        if j:
-            self.bio             = exist(j, 'content')
-            self.blogs_count     = exist(j, 'blogsCount')
-            self.com             = exist(j, 'ndcId', str)
-            self.comments_count  = exist(j, 'commentsCount')
-            self.created_time    = exist(j, 'createdTime')
-            self.followers_count = exist(j, 'membersCount')
-            self.following_count = exist(j, 'joinedCount')
-            self.im_following    = j['followingStatus'] == 1 if 'followingStatus' in j else None
-            self.level           = exist(j, 'level')
-            self.nickname        = exist(j, 'nickname')
-            self.posts_count     = exist(j, 'postsCount')
-            self.id              = exist(j, 'uid')
-            self.reputation      = exist(j, 'reputation')
-            self.role            = {0: 'member', 101: 'curator', 100: 'leader', 102: 'leader-agent'}[j['role']]
-            self.visitors_count  = exist(j, 'visitoresCount')
-
-    @classmethod
     async def search(
-        cls, uids: str | list[str], com: str | None = None
-    ) -> list[User]:
+        uids: str | list[str],
+        com:  str | None = None
+    ) -> DataUser | list[DataUser]:
+        """
+        Get profile information for a community user
+        """
 
-        com = actual_com or com
-        uids = [uids] if not isinstance(uids, (list, tuple)) else uids
+        com = com or actual_com
+        uids = to_list(uids)
 
-        async def foo(uid: str) -> User:
-            return cls(
-                (await _req('get', f'x{com}/s/user-profile/{uid}'))[
-                    'userProfile'
-                ]
-            )
+        async def foo(uid: str) -> DataUser:
+            return DataUser._make((await _req('get', f'x{com}/s/user-profile/{uid}')).json['userProfile'])
 
-        return await gather(*[foo(uid) for uid in uids])
+        return one_or_list(await gather(*[foo(uid) for uid in uids]))
 
-    async def ban(self, uid, *, reason, com=None):
-        com = actual_com or com
-        if len(reason.split()) < 3:
+    async def ban(
+        uid:    str,
+        *,
+        reason: str,
+        com:    str | None = None
+    ) -> Res:
+        """
+        Ban a user
+        """
+
+        if words(reason) < 3:
             raise SmallReasonForBan('Put a reason with at least three words')
 
         return await _req(
             'post',
-            f'x{com}/s/user-profile/{uid}/ban',
+            f'x{com or actual_com}/s/user-profile/{uid}/ban',
             data={'reasonType': 200, 'note': {'content': reason}},
         )
 
-    async def unban(self, uid, *, reason='', com=None):
-        com = com or actual_com
+    async def unban(
+        uid:    str,
+        *,
+        reason: str        = '',
+        com:    str | None = None
+    ) -> Res:
+        """
+        Unban a user
+        """
 
         return await _req(
             'post',
-            f'x{com}/s/user-profile/{uid}/unban',
+            f'x{com or actual_com}/s/user-profile/{uid}/unban',
             data={'note': {'content': reason}} if reason else None,
         )
 
 
 class File:
-    @staticmethod
-    def type_(file):
+    """
+    Stores methods for handling a file
+    """
+
+    def type(file: str | bytes) -> Literal[MediaType.LINK, MediaType.BYTES, MediaType.PATH]:
+        """
+        Checks whether the file is a link, bytes or path
+        """
+
         if isinstance(file, str) and file.startswith('http'):
             return MediaType.LINK
 
@@ -317,9 +326,14 @@ class File:
 
         return MediaType.PATH
 
-    @staticmethod
-    async def get(file: str) -> bytes:
-        type = File.type_(file)
+    async def get(file: str | bytes) -> bytes:
+        """
+        Returns the bytes of a file
+
+        If the file is a link, download the file
+        """
+
+        type = File.type(file)
 
         if type == MediaType.LINK:
             async with request('get', file) as res:
@@ -331,120 +345,106 @@ class File:
         with open(file, 'rb') as f:
             return f.read()
 
-    @staticmethod
     def b64(file_bytes: bytes) -> str:
+        """
+        Convert bytes to base64
+        """
+
         return b64encode(file_bytes).decode()
 
-    async def process(self, file: str | bytes) -> dict[str, Any] | NoReturn:
+    async def process(file: str | bytes) -> dict[str, Any] | NoReturn:
+        """
+        Returns the data to be used Message.send
+        """
+
         if (
-            self.type_(file) not in (MediaType.LINK, MediaType.BYTES)
+            File.type(file) not in (MediaType.LINK, MediaType.BYTES)
             and not Path(file).exists()
         ):
             raise FileNotFoundError(file)
 
-        b = await self.get(file)
+        b = await File.get(file)
+        b64 = File.b64(b)
+        type = (guess_mime(b) or 'audio/mp3').split('/')
 
-        # python-magic using at least the first 2048 bytes,
-        # as less can produce incorrect identification
-        #
-        # https://github.com/ahupp/python-magic#usage
-        type_ = from_buffer(b[:2048], mime=True).split('/')
-
-        if type_[1] == 'gif':
+        if type[-1] == 'gif':
                 return {
                 'mediaType': 100,
-                'mediaUploadValue': self.b64(b),
+                'mediaUploadValue': b64,
                 'mediaUploadValueContentType': 'image/gif',
                 'mediaUhqEnabled': True,
             }
 
-        if type_[0] == 'image':
+        if type[0] == 'image':
             return {
                 'mediaType': 100,
-                'mediaUploadValue': self.b64(b),
+                'mediaUploadValue': b64,
                 'mediaUhqEnabled': True,
             }
 
-        if type_[0] == 'audio':
+        if type[-1] == 'mp3':
             return {
                 'type': 2,
                 'mediaType': 110,
-                'mediaUploadValue': self.b64(b),
+                'mediaUploadValue': b64,
                 'mediaUhqEnabled': True,
             }
 
-        raise InvalidFileType(file if type_ != MediaType.BYTES else '')
-
 
 class Chat:
-    __slots__ = (
-        'announcement',
-        'bg',
-        'can_send_coins',
-        'co_hosts',
-        'creator',
-        'extensions',
-        'icon',
-        'id',
-        'is_pinned',
-        'is_private',
-        'members_can_invite',
-        'name',
-        'text',
-        'title',
-        'view_only'
-    )
+    async def search(
+        com:  str | None = None,
+        chat: str | None = None
+    ) -> DataChat:
+        """
+        Search for chat information
+        """
 
-    def __init__(self, j=None):
-        if j:
-            t = j['thread']
-            self.extensions         = exist(t, 'extensions')
-
-            self.announcement       = exist(self.extensions, 'announcement') or ''
-            self.bg                 = exist(self.extensions, 'bm')[1] if 'bm' in self.extensions else None
-            self.can_send_coins     = exist(t['tipInfo'], 'tippable') if 'tipInfo' in t else None
-            self.co_hosts           = exist(self.extensions, 'coHost') or []
-            self.creator            = exist(t['author'], 'uid')
-            self.icon               = exist(t, 'icon')
-            self.id                 = exist(t, 'threadId')
-            self.is_pinned          = exist(t, 'isPinned')
-            self.is_private         = exist(t, 'membersQuota') == 2
-            self.members_can_invite = exist(t, 'membersCanInvite')
-            self.name               = exist(t, 'title')
-            self.text               = '' if exist(t, 'content') in ('None', None) else exist(t, 'content')
-            self.view_only          = exist(self.extensions, 'viewOnly') or False
-
-    @classmethod
-    async def search(cls, com=None, chat=None):
-        com = actual_com or com
-        chat = actual_chat or chat
-
-        return cls(await _req(
-            'get',
-            f'x{com}/s/chat/thread/{chat}'
-        ))
+        return DataChat._make((await _req('get', f'x{com or actual_com}/s/chat/thread/{chat or actual_chat}')).json)
 
     async def messages(
-        self,
-        *,
-        check: Callable[[Message], bool] = lambda _: True,
-        com:   str | None = None,
-        chat:  str | None = None,
+        check: Callable[[ChatMsg], bool] = lambda _: True,
         start: int | None = None,
         end:   int | None = None,
-    ) -> list[Message.from_chat]:
+        com:   str | None = None,
+        chat:  str | None = None,
+    ) -> list[ChatMsg]:
+        """
+        Returns a list containing the most recent to the oldest messages in a chat
 
-        com = actual_com or com
-        chat = actual_chat or chat
+        ### check
+        ```
+        def check(m: ChatMsg):
+            return m.level > 8
+
+        await Chat.messages(check=check)
+        ```
+
+        Get all messages from people with a level > 8
+
+        ### start, end
+        ```
+        msgs = (await Chat.messages())[10: 100]
+            
+        msgs = await Chat.messages(start=10, end=100)
+        ```
+
+        The two are the same, the advantage of the second way is that the first gets all the messages and then gets the 10-100 messages
+
+        The second gets only 10-100 messages instead of getting all, it is faster
+        """
+
+        com = com or actual_com
+        chat = chat or actual_chat
         messages = []
 
         res = await _req(
             'get',
             f'x{com}/s/chat/thread/{chat}/message?v=2&pagingType=t&size=100',
         )
-        token = res['paging']['nextPageToken']
-        for msg_ in res['messageList']:
-            if check(msg := Message().from_chat(msg_)):
+        token = res.json['paging']['nextPageToken']
+        for msg_ in res.json['messageList']:
+            if check(msg := MESSAGE.from_chat(msg_)):
                 messages.append(msg)
 
         while True:
@@ -452,38 +452,57 @@ class Chat:
                 'get',
                 f'x{com}/s/chat/thread/{chat}/message?v=2&pagingType=t&pageToken={token}&size=100',
             )
-            for msg in res['messageList']:
-                if check(msg := Message().from_chat(msg)):
+            for msg in res.json['messageList']:
+                if check(msg := MESSAGE.from_chat(msg)):
                     messages.append(msg)
 
             if on_limit(messages, end):
                 break
 
             try:
-                token = res['paging']['nextPageToken']
+                token = res.json['paging']['nextPageToken']
             except KeyError:
                 break
 
         return messages[start:end]
 
     async def clear(
-        self,
         msgs:  str | list[str] | None = None,
-        check: Callable[[Message], bool] = lambda _: True,
+        check: Callable[[ChatMsg], bool] = lambda _: True,
         com:   str | None = None,
         chat:  str | None = None,
         start: int | None = None,
         end:   int | None = None,
-    ) -> list[Req_json]:
+    ) -> Res | list[Res]:
+        """
+        Delete chat messages
 
-        com = actual_com or com
-        chat = actual_chat or chat
+        ## If msgs == None, it will delete all chat messages
+
+        ### msgs
+        Message ids to be deleted
+
+        ### check
+        ```
+        def check(m: ChatMsg):
+            return m.level > 8
+
+        await Chat.messages(check=check)
+        ```
+
+        Delete all messages from people with a level > 8
+
+        ### start, end
+        Explanation in Chat.message
+        """
+
+        com = com or actual_com
+        chat = chat or actual_chat
         msgs = (
-            ([msgs] if not isinstance(msgs, (tuple, list)) else msgs)
+            to_list(msgs)
             if msgs
             else [
-                msg.id
-                for msg in await self.messages(
+                msg.id for msg in await Chat.messages(
                     check=check, com=com, chat=chat, start=start, end=end
                 )
             ]
@@ -496,18 +515,42 @@ class Chat:
                 data={'adminOpName': 102},
             )
 
-        return await gather(*[foo(msg) for msg in msgs])
+        return one_or_list(await gather(*[foo(msg) for msg in msgs]))
 
     async def members(
-        self,
-        check: Callable[[Message], bool] = lambda _: True,
+        check: Callable[[DataUser], bool] = lambda _: True,
         com:   str | None = None,
         chat:  str | None = None,
         start: int | None = None,
         end:   int | None = None,
-    ):
-        com = actual_com or com
-        chat = actual_chat or chat
+    ) -> list[DataUser]:
+        """
+        Returns members of a chat
+
+        ### check
+        ```
+        def check(m: DataUser):
+            return 'L' in m.nickname 
+
+        await Chat.members(check=check)
+        ```
+
+        Get all members that have 'L' in the nickname
+
+        ### start, end
+        ```
+        msgs = (await Chat.members())[10: 100]
+            
+        msgs = await Chat.members(start=10, end=100)
+        ```
+
+        The two are the same, the advantage of the second way is that the first gets all the members and then gets the 10-100 members
+
+        The second gets only 10-100 members instead of getting all, it is faster
+        """
+
+        com = com or actual_com
+        chat = chat or actual_chat
 
         async def foo(i):
             res = await _req(
@@ -515,50 +558,195 @@ class Chat:
                 f'x{com}/s/chat/thread/{chat}/member?start={i}&size=100&type=default&cv=1.2',
             )
             return [
-                i
-                for i in [
-                    User(i) for i in res['memberList'] if res['memberList']
+                i for i in [
+                    DataUser._make(i) for i in res.json['memberList'] if res.json['memberList']
                 ]
                 if check(i)
             ]
 
-        members_count = (await _req('get', f'x{com}/s/chat/thread/{chat}'))[
-            'thread'
-        ]['membersCount']
+        members_count = (await _req(
+            'get', f'x{com}/s/chat/thread/{chat}'
+        )).json['thread']['membersCount']
+
         MAX_MEMBERS_COUNT_IN_CHAT = 1000
         return (
             await gather(
                 *[
-                    foo(i)
-                    for i in range(0, MAX_MEMBERS_COUNT_IN_CHAT, 100)
+                    foo(i) for i in range(0, MAX_MEMBERS_COUNT_IN_CHAT, 100)
                     if i <= members_count
                 ]
             )
         )[0][start:end]
 
-    async def join(self, chat: str, com: str | None = None):
-        com = actual_com or com
-        chat = [chat] if not isinstance(chat, (list, tuple)) else chat
+    async def join(
+        chats: str | list[str],
+        com:   str | None = None
+    ) -> Res | list[Res]:
+        """
+        Enter a chat
+        """
 
         async def foo(i):
             return await _req(
-                'post', f'x{com}/s/chat/thread/{i}/member/{bot_id}'
+                'post', f'x{com or actual_com}/s/chat/thread/{i}/member/{bot_id}'
             )
 
-        return await gather(*[foo(i) for i in chat])
+        return one_or_list(await gather(*[foo(i) for i in to_list(chats)]))
 
-    async def leave(self, chat: str, com: str | None = None):
-        com = actual_com or com
-        chat = [chat] if not isinstance(chat, (list, tuple)) else chat
+    async def leave(
+        chats: str | list[str],
+        com:   str | None = None
+    ) -> Res | list[Res]:
+        """
+        Leave a chat
+        """
 
         async def foo(i):
             return await _req(
-                'delete', f'x{com}/s/chat/thread/{i}/member/{bot_id}'
+                'delete', f'x{com or actual_com}/s/chat/thread/{i}/member/{bot_id}'
             )
 
-        return await gather(*[foo(i) for i in chat])
+        return one_or_list(await gather(*[foo(i) for i in to_list(chats)]))
 
-    async def save(self, filename=None):
+    async def create(
+        name:           str,
+        text:           str | None  = None,
+        bg:             str | bytes = None,
+        icon:           str | bytes = None,
+        only_fans:      bool        = False,
+        invite_members: list[str]   = [],
+        com:            str | None  = None
+    ) -> Res:
+        """
+        Create a chat
+        """
+
+        img = [100, await upload_chat_bg(bg), None] if bg else bg
+        data = {
+            'backgroundMedia': img,
+            'extensions': {
+                'bm': img,
+                'fansOnly': only_fans
+            },
+            'title': name,
+            'content': text,
+            'icon': await upload_chat_icon(icon) if icon else icon,
+            'inviteeUids': invite_members,
+
+            # need this to work
+            'type': 2,
+            'eventSource': 'GlobalComposeMenu'
+        }
+
+        return await _req('post', f'x{com or actual_com}/s/chat/thread', data=data)
+
+    async def delete(
+        com:  str | None = None,
+        chat: str | None = None
+    ) -> Res:
+        """
+        Delete a chat
+        """
+
+        return await _req('delete', f'x{com or actual_com}/s/chat/thread/{chat or actual_chat}')
+
+    async def edit(
+        name:               str  | None         = None,
+        text:               str  | None         = None,
+        bg:                 str  | bytes | None = None,
+        pin:                bool | None         = None,
+        announcement:       str  | None         = None,
+        only_view:          bool | None         = None,
+        members_can_invite: bool | None         = None,
+        can_send_coins:     bool | None         = None,
+        change_adm_to:      str  | None         = None,
+        com:                str  | None         = None,
+        chat:               str  | None         = None
+    ) -> None:
+        """
+        Edit a chat
+        """
+
+        com = com or actual_com
+        chat = chat or actual_chat
+
+        info = await Chat.search(chat=chat)
+        if name or text:
+            data = {
+                'extensions': {
+                    'bm': [100, await upload_chat_bg(bg), None] if bg else bg,
+                    'fansOnly': info.only_fans
+                },
+                'title': name or info.name,
+                'content': text or info.text,
+                'icon': await upload_chat_icon(info.icon) if info.icon else info.icon,
+
+                # need this to work
+                'type': 2,
+                'eventSource': 'GlobalComposeMenu'
+            }
+            await _req('post', f'x{com}/s/chat/thread/{chat}', data=data)
+
+
+        if bg:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/member/{bot_id}/background', data=await File.process(bg))
+        elif bg == False:
+            await _req('delete', f'x{com}/s/chat/thread/{chat}/member/{bot_id}/background')
+
+        if pin:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/pin')
+        elif pin == False:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/unpin')
+
+        if announcement:
+            await _req('post', f'x{com}/s/chat/thread/{chat}', data={'announcement': announcement, 'pinAnnouncement': True})
+        elif announcement == False:
+            await _req('post', f'x{com}/s/chat/thread/{chat}', data={'pinAnnouncement': False})
+
+        if only_view:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/view-only/enable')
+        elif only_view == False:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/view-only/disable')
+
+        if members_can_invite:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/members-can-invite/enable')
+        elif members_can_invite == False:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/members-can-invite/disable')
+
+        if can_send_coins:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/tipping-perm-status/enable')
+        elif can_send_coins == False:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/tipping-perm-status/disable')
+
+        if change_adm_to:
+            await _req('post', f'x{com}/s/chat/thread/{chat}/transfer-organizer', data={'uidList': [change_adm_to]})
+
+    async def change_co_hosts(
+        add:    list[str] | str | None = None,
+        remove: list[str] | str | None = None,
+        com:    str | None = None,
+        chat:   str | None = None
+    ) -> Res | list[Res]:
+        """
+        Add or remove co-hosts
+        """
+
+        com = com or actual_com
+        chat = chat or actual_chat
+        add = to_list(add)
+
+        if add:
+            return await _req('post', f'x{com}/s/chat/thread/{chat}/co-host', data={'uidList': add})
+        elif remove:
+            async def foo(i):
+                return await _req('delete', f'x{com}/s/chat/thread/{chat}/co-host/{i}')
+            return one_or_list(await gather(*[foo(i) for i in remove]))
+
+    async def save(filename: str | None = None) -> None:
+        """
+        Saves all information from a chat to a .json
+        """
+
         chat = await Chat.search()
         info = {
             'name': chat.name,
@@ -568,37 +756,86 @@ class Chat:
             'bg': chat.bg,
             'icon': chat.icon,
 
-            'creator': chat.creator,
-            'co-hosts': chat.co_hosts,
+            'adm': chat.adm,
+            'co_hosts': chat.co_hosts,
 
-            'can-send-coins': chat.can_send_coins,
-            'is-pinned': chat.is_pinned,
-            'only-view': chat.view_only,
+            'members_can_invite': chat.members_can_invite,
+            'can_send_coins': chat.can_send_coins,
+            'is_pinned': chat.is_pinned,
+            'only_view': chat.only_view,
+            'only_fans': chat.only_fans,
 
-            'members': [i.id for i in await self.members()]
+            'members': [i.id for i in await Chat.members()]
         }
 
         n = 0
         while Path(f'{n}.json').exists():
             n += 1
         with open(filename or f'{n}.json', 'w') as f:
-            dump(info, f, indent=4, ensure_ascii=False, escape_forward_slashes=False)
+            dump(info, f, indent=4, escape_forward_slashes=False)
 
+    async def load(filename: str) -> None:
+        """
+        Creates a chat containing the .json information created by Chat.save
+
+        The name will be a uuid4 in the beginning for the program to identify the chat that was created,
+        after that it will change to the correct name
+        """
+
+        with open(filename, 'r') as f:
+            f = load(f)
+
+        tmp_chat_name = str(uuid4())
+        await Chat.create(
+            name           = tmp_chat_name,
+            text           = f['text'],
+            bg             = f['bg'],
+            icon           = f['icon'],
+            only_fans      = f['only_fans'],
+            invite_members = f['members']
+        )
+
+        chats = list((await Community.chats()).values())[0]
+        names = [i.name for i in chats]
+        ids   = [i.id for i in chats]
+
+        await Chat.edit(
+            name               = f['name'],
+            pin                = f['is_pinned'],
+            announcement       = f['announcement'],
+            only_view          = f['only_view'],
+            members_can_invite = f['members_can_invite'],
+            can_send_coins     = f['can_send_coins'],
+            change_adm_to      = f['adm'] if f['adm'] != bot_id else None,
+            chat               = ids[names.index(tmp_chat_name)]
+        )
+
+        await Chat.change_co_hosts(f['co_hosts'])
 
 class Community:
-    @staticmethod
-    async def chats(com=None, need_print=False, ignore_ascii=False):
-        if not actual_com and not com:
-            raise Exception('Enter a com or send a message in a chat')
+    async def chats(
+        need_print:   bool       = False,
+        ignore_ascii: bool       = False,
+        com:          str | None = None
+    ) -> dict[str, list[DataChat]]:
+        """
+        Returns the chats that you are in the community
 
-        com = com or actual_com
-        com = [com] if not isinstance(com, (list, tuple)) else com
+        ### need_print
+        Print the chats in a readable form
+
+        ### ignore_ascii
+        Removes special characters, which can disrupt the need_print
+        """
+
+        if not (com := to_list(com or actual_com)):
+            raise EmptyCom('Enter a com or send a message in a chat')
 
         async def foo(i):
             res = await _req(
                 'get', f'x{i}/s/chat/thread?type=public-all&start=0&size=100'
             )
-            return {str(i): [Chat(i) for i in res['threadList']]}
+            return {str(i): [{'name': i['title'], 'id': i['threadId']} for i in res.json['threadList']]}
 
         a = await gather(*[foo(i) for i in com])
         chats = {k: v for i in a for k, v in i.items()}
@@ -608,7 +845,7 @@ class Community:
                 max_name = len(
                     max(
                         [
-                            i.name if not ignore_ascii else fix_ascii(i.name)
+                            i['name'] if not ignore_ascii else fix_ascii(i['name'])
                             for i in e
                         ],
                         key=len,
@@ -616,23 +853,47 @@ class Community:
                 )
                 print(i)
                 for n in e:
-                    name = n.name if not ignore_ascii else fix_ascii(n.name)
+                    name = n['name'] if not ignore_ascii else fix_ascii(n['name'])
                     a = max_name - len(name)
-                    print(f"    {name} {' '*a}-> {n.id}")
+                    print(f"    {name} {' '*a}-> {n['id']}")
                 print()
         return chats
 
+    async def staff(com=None) -> Dict[list[Dict[str, str]]]:
+        """
+        Returns a dictionary containing community leaders and curators
+        """
+
+        if not (com := com or actual_com):
+            raise EmptyCom('Enter a com or send a message in a chat')
+
+        leaders  = [{'nickname': i['nickname'], 'uid': i['uid']} for i in (await _req('get', f'x{com}/s/user-profile?type=leaders&start=0&size=100')).json['userProfileList']]
+        curators = [{'nickname': i['nickname'], 'uid': i['uid']} for i in (await _req('get', f'x{com}/s/user-profile?type=curators&start=0&size=100')).json['userProfileList']]
+        return {'leaders': leaders, 'curators': curators}
+
 
 class My:
-    @staticmethod
-    async def chats(need_print=True, ignore_ascii=False):
+    async def chats(
+        need_print:   bool = True,
+        ignore_ascii: bool = False
+    ) -> dict[str, list[str, list[str]]]:
+        """
+        Returns chats in which you are from all communities
+
+        ### need_print
+        Print the chats in a readable form
+
+        ### ignore_ascii
+        Removes special characters, which can disrupt the need_print
+        """
+
         res = await _req('get', 'g/s/community/joined?v=1&start=0&size=50')
-        coms = {str(i['ndcId']): [i['name'], []] for i in res['communityList']}
+        coms = {str(i['ndcId']): [i['name'], []] for i in res.json['communityList']}
 
         async def foo(i):
-            return await _req(
+            return (await _req(
                 'get', f'x{i}/s/chat/thread?type=joined-me&start=0&size=100'
-            )
+            )).json
 
         chats = await gather(*[foo(i) for i in coms])
 
@@ -667,14 +928,26 @@ class My:
 
         return coms
 
-    @staticmethod
-    async def communities(need_print=True, ignore_ascii=False):
-        res = await _req('get', f'g/s/community/joined?v=1&start=0&size=50')
+    async def communities(
+        need_print:   bool = True,
+        ignore_ascii: bool = False
+    ) -> dict[str, str]:
+        """
+        Returns all the communities you are in
+
+        ### need_print
+        Print the chats in a readable form
+
+        ### ignore_ascii
+        Removes special characters, which can disrupt the need_print
+        """
+
+        res = await _req('get', f'g/s/community/joined?v=1&start=0&size=100')
         coms = {
             i['name']
             if not ignore_ascii
             else fix_ascii(i['name']): str(i['ndcId'])
-            for i in res['communityList']
+            for i in res.json['communityList']
         }
 
         if need_print:
@@ -684,3 +957,10 @@ class My:
                 print(f'{i} {" "*a} -> {e}')
 
         return coms
+
+
+# # # # # # #
+#   Cache   #
+# # # # # # #
+
+MESSAGE = Message()

@@ -4,27 +4,33 @@ import sys
 from os import environ, execl
 
 from asyncio import (
-    get_event_loop,
-    run_coroutine_threadsafe,
-    iscoroutinefunction,
     wait_for,
-    AbstractEventLoop
+    new_event_loop,
+    iscoroutinefunction,
+    run_coroutine_threadsafe,
+    AbstractEventLoop,
+    TimeoutError,
+    Future
 )
 from dotenv import load_dotenv
-from typing import Any, Callable, Awaitable, Coroutine, NoReturn
+from typing import (
+    Any,
+    Callable,
+    Awaitable,
+    Coroutine,
+    NoReturn
+)
 from pathlib import Path
 from threading import Thread
 from subprocess import run
 
-from ujson import loads
-from aiohttp import ClientSession
-from colorama import Fore, init
-init()
+from colorama import Fore, Style, init
 
-from . import obj
 from .ws import Ws
 from .db import DB
-from .obj import Message
+from .obj import Message, Req
+from .utils import Slots, clear
+from .dataclass import WsMsg, Embed, Res
 from .exceptions import (
     AccountNotFoundInDotenv,
     EventIsntAsync,
@@ -34,13 +40,19 @@ from .exceptions import (
     InvalidEvent
 )
 
-Coro_return_Message = Callable[[], Coroutine[Message, None, None]]
-Coro_return_Any = Callable[[], Coroutine[Any, None, None]]
-Coro_return_None = Callable[[], Coroutine[None, None, None]]
+Coro_return_ws_msg = Callable[[], Coroutine[WsMsg, None, None]]
+Coro_return_Any    = Callable[[], Coroutine[Any, None, None]]
+Coro_return_None   = Callable[[], Coroutine[None, None, None]]
 
-version = '0.0.28'
+version = '0.0.46'
 
-class Bot:
+class Bot(Slots):
+    """
+    Represents the bot
+    """
+
+    __slots__ = ['_ws']
+
     def __init__(
         self,
         email:        str | None           = None,
@@ -49,6 +61,31 @@ class Bot:
         only_chats:   dict[str, list[str]] = {},
         ignore_chats: dict[str, list[str]] = {}
     ):
+        """
+        #### only_chats
+        
+        Dictionary of chats that the bot will *hear* the commands
+
+        #### ignore_chats
+        
+        Dictionary of chats that the bot will ignore the commands
+    
+        #### Example:
+
+        ```
+        chats = {
+            '1111111': ['00000000-0000-0000-0000-000000000000', '11111111-1111-1111-1111-111111111111'],
+            '2222222': [] # Empty list means all chats`
+        }
+
+        bot = Bot(only_chats=chats)
+        ```
+
+        The bot had listened to the 00000.... 11111.... chats from the 1111111 community,
+        and had listened to all the chats in the community 2222222.
+        """
+
+        init()
         # load_dotenv is not identifying the .env on project folder,
         # so I use Path to get the absolute .env path
         load_dotenv(Path('.env').absolute())
@@ -63,34 +100,44 @@ class Bot:
         if only_chats and ignore_chats:
             raise InvalidChatChoice('Enter chats only in "only_chats" or "ignore_chats"')
 
-        obj.clear()
-
-        self.id:      str | None        = None
-        self._db:     DB                = DB()
-        self._msg:    Message           = Message()
-        self._loop:   AbstractEventLoop = get_event_loop()
-        self._prefix = prefix
+        self.id:    str               = 'ws.run'
+        self.sid:   str               = 'ws.run'
+        self._db:   DB                = DB()
+        self._msg:  Message           = Message()
+        self._loop: AbstractEventLoop = new_event_loop()
+        self.prefix = prefix
 
         self.only_chats   = only_chats
         self.ignore_chats = ignore_chats
 
-        self.commands:    dict[str, dict[str, list[str] | Coro_return_None | str]] = {}
-        self.events:      dict[str, list[Coro_return_None]] = {
-                                                        'ready':      [],
-                                                        'close':      [],
-                                                        'message':    [],
-                                                        'join_chat':  [],
-                                                        'leave_chat': [],
-                                                        'image':      []
-                                                    }
+        self.commands: dict[str, dict[str, list[str], Coro_return_None, str]] = {}
+        self.events:   dict[str, list[Coro_return_None]] = {
+                                                    'ready':      [],
+                                                    'close':      [],
+                                                    'message':    [],
+                                                    'join_chat':  [],
+                                                    'leave_chat': [],
+                                                    'image':      []
+                                                }
 
     def add(
         self,
         help:    str       = 'No help',
         aliases: list[str] = []
-    ) -> Callable[[Coro_return_Message], None]:
+    ) -> Callable[[Coro_return_ws_msg], None]:
+        """
+        Adds a command to the bot
 
-        def foo(f: Coro_return_Message) -> None:
+        ```
+        @bot.add()
+        async def hi(m: WsMsg):
+            await bot.send(f'Hi, {m.nickname}')
+        ```
+
+        Created the `hi` command
+        """
+
+        def foo(f: Coro_return_ws_msg) -> None:
             if not iscoroutinefunction(f):
                 raise CommandIsntAsync('Command must be async: "async def ..."')
             self.commands[f.__name__] = {
@@ -100,8 +147,19 @@ class Bot:
                                 }
         return foo
 
-    def on(self) -> Callable[[Coro_return_Message], None]:
-        def foo(f: Coro_return_Message) -> None:
+    def on(self) -> Callable[[Coro_return_ws_msg], None]:
+        """
+        Adds a event to the bot
+
+        ```
+        @bot.on()
+        async def message(m: WsMsg):
+            print(m.text)
+        ```
+
+        Created the `message` event
+        """
+        def foo(f: Coro_return_ws_msg) -> None:
             if f.__name__ not in self.events:
                 raise InvalidEvent(f.__name__)
 
@@ -112,29 +170,53 @@ class Bot:
         return foo
 
     async def check_update(self) -> NoReturn | None:
+        """
+        Checks whether lib or lib dependencies need updating
+
+        Checks each day if the lib needs to update
+        Checks every 3 days if the dependencies need to update
+
+        If the program runs on heroku, the program will not check for updates
+        """
+
+        def try_update() -> NoReturn | None:
+            if self._db.deps_need_update():
+                cmd = run('pip install -U amsync', capture_output=True, text=True)
+            else:
+                cmd = run('pip install -U amsync --no-deps', capture_output=True, text=True)
+
+            if cmd.returncode:
+                clear()
+                print(f'Error updating from version {Style.BRIGHT}{version}{Style.NORMAL} to {Fore.CYAN}{new}{Fore.WHITE}\n\n')
+                print(cmd.stderr or cmd.stdout)
+                sys.exit(1)
+
         if (
             'DYNO' not in environ   # not in heroku
             and self._db.lib_need_update()
-        ):
-            async with ClientSession(json_serialize=loads) as s:
-                async with s.get('https://pypi.org/pypi/Amsync/json') as res:
-                    new = (await res.json(loads=loads))['info']['version']
-                    if new != version:
-                        print(f'There is a new version: {Fore.CYAN}{new}{Fore.WHITE}\nDo you want to update it? (Y/n) ', end='')
-                        if input().lower() == 'y':
-                            obj.clear()
-                            print('Updating')
-                            if self._db.deps_need_update():
-                                run('pip install -U --force-reinstall --no-cache amsync', capture_output=True, text=True)
-                            run('pip uninstall -y amsync && pip install amsync', capture_output=True, text=True)
-                            obj.clear()
-                            print('Restarting...\n')
-                            execl(sys.executable, Path(__file__).absolute(), *sys.argv)
-                        obj.clear()
+        ):      
+            new = (await Req.new('get', 'https://pypi.org/pypi/Amsync/json')).json['info']['version']
+            if new != version:
+                print(f'There is a new version: {Fore.CYAN}{new}{Fore.WHITE}')
+                print(f'Actual version: {Style.BRIGHT}{version}{Style.NORMAL}\n')
+                print(f'Do you want to update it? (Y/n) ', end='')
+                if input().lower() == 'y':
+                    clear()
+                    print('Updating...')
+                    try_update()
+                    clear()
+                    print('Restarting...\n')
+                    execl(sys.executable, Path(__file__).absolute(), *sys.argv)
+                clear()
 
     def run(self) -> None:
+        """
+        Start the bot
+        """
+
         self._loop.run_until_complete(self.check_update())
         self._ws: Ws = Ws(
+            loop         = self._loop,
             email        = self._email,
             password     = self._password,
             only_chats   = self.only_chats,
@@ -161,23 +243,51 @@ class Bot:
     async def send(
         self,
         *msgs: list[str],
-        files: str     | None = None,
-        type_: int     | None = 0,
-        embed: 'Embed' | None = None, # type: ignore
-        com:   str     | None = None,
-        chat:  str     | None = None,
-    ) -> Awaitable[list[dict[str, Any]]]:
+        files: str   | None = None,
+        type_: int   | None = 0,
+        embed: Embed | None = None,
+        reply: str   | None = None,
+        com:   str   | None = None,
+        chat:  str   | None = None
+    ) -> Res | list[Res]:
+        """
+        Send a message, file, embed or reply
+
+        #### reply
+
+        Message id to reply
+        """
 
         return await self._msg.send(
             *msgs,
             files = files,
             type_ = type_,
             embed = embed,
+            reply = reply,
             com   = com,
             chat  = chat
         )
 
-    async def wait_for(self, check=lambda _: True, timeout=None):
+    async def wait_for(
+        self,
+        check:   Callable[[WsMsg], bool] = lambda _: True,
+        timeout: int | None              = None
+    ) -> Awaitable[Future, int | None] | None:
+        """
+        Wait for a message until the check is met or timeout finish
+
+        If the condition is met, the message returns, if not returns None
+
+        ```
+        def check(_m: WsMsg):
+            return _m.text == 'Hello'
+
+        await bot.wait_for(check=check, timeout=10)
+        ```
+
+        Wait for a message to have the text "Hello" or pass 10 seconds    
+        """
+
         future = self._loop.create_future()
         self._ws.futures.append(future)
 
@@ -191,15 +301,24 @@ class Bot:
             # Delete the future canceled by asyncio.wait_for
             del self._ws.futures[self._ws.futures.index(future)]
 
+    def _is_alias(self, name):
+        for command_name, args in self.commands.items():
+            if name in args['aliases']:
+                return command_name
+
     async def _call(self, m: Message) -> None:
-        if (
-            m.text
-            and m.text.startswith(self._prefix)
-            and (
-                (command_name := m.text.split()[0][len(self._prefix):])
-                in self.commands
-            )
-        ):
-            # Remove command name from text
-            m.text = ' '.join(m.text.split()[1:])
-            self._loop.create_task(self.commands[command_name]['def'](m))
+        if m.text and m.text.startswith(self.prefix):
+            splited      = m.text.split()
+            name         = splited[0][len(self.prefix):]
+            command_name = self._is_alias(name) or name
+
+            if command_name in self.commands:
+                if (
+                    len(splited) > 1 
+                    and splited[1] in (f'{self.prefix}h', f'{self.prefix}help')
+                ):
+                    await self.send(self.commands[command_name]['help'])
+                else:
+                    # Remove command name from text
+                    m.text = ' '.join(splited[1:])
+                    self._loop.create_task(self.commands[command_name]['def'](m))

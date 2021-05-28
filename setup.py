@@ -6,7 +6,7 @@ with open('README.md', 'r') as stream:
 
 setup(
     name='Amsync',
-    version='0.0.28',
+    version='0.0.46',
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',
@@ -40,6 +40,7 @@ setup(
         'License :: OSI Approved :: MIT License',
         'Operating System :: Microsoft :: Windows',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9'
     ],
     entry_points={
         'console_scripts': [

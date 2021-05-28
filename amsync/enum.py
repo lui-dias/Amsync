@@ -8,3 +8,9 @@ class MediaType(Enum):
 
 class WsStatus(Enum):
     CLOSED = 0
+    OPEN = 1
+
+class RandomThingsState(Enum):
+    START = 0
+    STOP  = 1
+    WAIT  = 2

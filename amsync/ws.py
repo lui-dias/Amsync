@@ -1,58 +1,90 @@
 from __future__ import annotations
 
-from typing import Any, Callable, AsyncIterator, Coroutine
-from asyncio import get_event_loop, AbstractEventLoop, Future
+from re import search
+from typing import AsyncIterator, Literal
+from asyncio import AbstractEventLoop, Future, sleep
 from contextlib import suppress
 
-from ujson import dumps, loads
-from aiohttp import ClientSession
+from ujson import loads
+from aiohttp import ClientSession, WSServerHandshakeError
+from colorama import Fore
 from pybase64 import urlsafe_b64decode
 
 from . import obj
 from .db import DB
 from .obj import Message, _req
 from .enum import WsStatus
-
-Coro_return_None = Callable[[], Coroutine[None, None, None]]
-Coro_return_Message = Callable[[], Coroutine[Message, None, None]]
-Coro_return_Any = Callable[[], Coroutine[Any, None, None]]
+from .utils import Slots, clear
+from .dataclass import WsMsg
 
 
-class Ws:
+class Ws(Slots):
+    __slots__ = [
+        '_events',
+        '_decoded'
+    ]
+
     def __init__(
         self,
-        email:        str,
-        password:     str,
-        only_chats:   dict[str, list[str]] = {},
-        ignore_chats: dict[str, list[str]] = {}
+        loop:          AbstractEventLoop, 
+        email:        'Bot.email',             # type: ignore
+        password:     'Bot.password',          # type: ignore
+        only_chats:   'Bot.only_chats'   = {}, # type: ignore
+        ignore_chats: 'Bot.ignore_chats' = {}  # type: ignore
     ):
         self._deviceid: str               = obj.headers['NDCDEVICEID']
-        self._loop:     AbstractEventLoop = get_event_loop()
+        self._loop:     AbstractEventLoop = loop
         self._db:       DB                = DB()
         self.futures:   list[Future]      = []
+        self._msg = Message()
 
         self._email        = email
         self._password     = password
         self._only_chats   = only_chats
         self._ignore_chats = ignore_chats
+        self._status       = WsStatus.OPEN
 
 
     async def _get_sid(self) -> str:
+        """
+        Get the account sid
+        """
+
         return (await _req('post', 'g/s/auth/login', data={
             'email':    self._email,
             'secret':  f'0 {self._password}',
             'deviceID': self._deviceid,
-        }))['sid']
+        })).json['sid']
 
-    async def _connect(self) -> AsyncIterator[Message]:
-        async with ClientSession(json_serialize=dumps) as session:
-            ws = await session.ws_connect(
-                f'wss://ws1.narvii.com/?signbody={self._deviceid}',
-                headers=obj.headers,
-            )
+    async def _connect(self) -> AsyncIterator[WsMsg]:
+        """
+        Connect the websocket
+        """
+
+        async with ClientSession() as session:
+            while True:
+                try:
+                    ws = await session.ws_connect(
+                        f'wss://ws1.narvii.com/?signbody={self._deviceid}',
+                        headers=obj.headers,
+                    )
+                    break
+                except WSServerHandshakeError as e:
+                    if str(e)[0] == '5':
+                        clear()
+                        for i in range(5):
+                            print(f'Amino servers died, wait {Fore.CYAN}{5-i}{Fore.WHITE}s')
+                            await sleep(1)
+                            clear()
+
+                        print(f'{Fore.GREEN}Reconnecting...{Fore.WHITE}')
+                    else:
+                        raise
+
+            clear()
             self._call_events('ready')
 
-            while True:
+            while self._status == WsStatus.OPEN: # for tests
                 if ws.closed:
                     self._call_events('close')
                     yield WsStatus.CLOSED
@@ -62,13 +94,31 @@ class Ws:
                 with suppress(TypeError):
                     res = await ws.receive_json(loads=loads)
                     if res['t'] == 1000:
-                        yield Message().from_ws(res['o'])
+                        yield self._msg.from_ws(res['o'])
 
-    def _call_events(self, event):
-        for i in self._events[event]:
-            self._loop.create_task(i())
+    def _call_events(
+        self,
+        name: str,
+        *m: list[WsMsg]
+    ) -> None:
+        """
+        Calls all events with the specific name
+        """
 
-    def _can_call(self, msg: Message):
+        for i in self._events[name]:
+            self._loop.create_task(i(*m))
+
+    def _fix_sid(self, sid: str) -> str:
+        """
+        Fix the size of the sid
+        """
+
+        # Sometimes sid can be an invalid base64,
+        # causing a padding error in urlsafe_b64decode
+        # Add = until sid has the len of 192 or len % 4 == 0 solve the problem
+        return sid + '=' * (192 - len(sid))
+
+    def _can_call(self, msg: WsMsg) -> Literal[True] | None:
         if not self._only_chats and not self._ignore_chats:
             return True
 
@@ -90,24 +140,24 @@ class Ws:
 
     async def run(
         self,
-        call:   Coro_return_None,
-        events: dict[str, list[Coro_return_Any]],
-        bot:    'Bot' # type: ignore
+        call:   'Bot._call',  # type: ignore
+        events: 'Bot.events', # type: ignore
+        bot:    'Bot'         # type: ignore
     ) -> None:
+        """
+        Start the bot
+        """
+    
         if not self._db.get_account(self._email):
-            self._db.add_account(self._email, await self._get_sid())
+            self._db.add_account(self._email, self._fix_sid(await self._get_sid()))
 
-        # Sometimes sid can be an invalid base64,
-        # causing a padding error in urlsafe_b64decode
-        # Add = until sid has the len of 192 solve the problem
-        tmp = self._db.get_account(self._email)
-        sid = tmp + '=' * (192 - len(tmp))
+        sid = self._db.get_account(self._email)
 
         obj.headers['NDCAUTH'] = f'sid={sid}'
-        id_ = loads(
-            urlsafe_b64decode(sid[:-28])[1:] + b'}'
-        )['2']
+        self._decoded = urlsafe_b64decode(sid).decode('cp437')
+        id_ = search(r'\w{8}-\w{4}-\w{4}-\w{4}-\w{12}', self._decoded,).group()
 
+        bot.sid = sid
         bot.id = id_
         obj.bot_id = id_
 
@@ -122,11 +172,12 @@ class Ws:
 
         async for m in self._connect():
             if m == WsStatus.CLOSED:
+                # Reconnect
                 return await self.run(call, self._events, bot)
 
             if self._can_call(m):
                 with suppress(KeyError):
-                    self._call_events(events[f'{m.type}:{m.media_type}'])
+                    self._call_events(events[f'{m.type}:{m.media_type}'], m)
 
                 if self.futures:
                     for future in self.futures:

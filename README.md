@@ -12,20 +12,10 @@ pip install Amsync
 <br>
 <br>
 
-# Update
-
-```
-pip install Amsync -U
-```
-Or wait a while for a message to appear in the program and it will update itself
-
-<br>
-<br>
-
 # Minimal example
 
 ```py
-from amsync import Bot, Message
+from amsync import Bot, WsMsg
 
 
 bot = Bot('email', 'password', prefix='/')
@@ -35,7 +25,7 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def hello(m: Message):
+async def hello(m: WsMsg):
     await bot.send(f'Hello {m.nickname}')
 
 bot.run()
