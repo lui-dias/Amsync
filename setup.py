@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
-
+from amsync import __version__
 
 with open('README.md', 'r') as stream:
     long_description = stream.read()
 
 setup(
     name='Amsync',
-    version='0.0.46',
+    version=__version__,
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',

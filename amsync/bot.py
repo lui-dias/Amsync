@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from re import search
 from os import environ, execl
 
 from asyncio import (
@@ -18,6 +19,8 @@ from typing import (
     Callable,
     Awaitable,
     Coroutine,
+    Dict,
+    Literal,
     NoReturn
 )
 from pathlib import Path
@@ -27,8 +30,8 @@ from subprocess import run
 from colorama import Fore, Style, init
 
 from .ws import Ws
-from .db import DB
-from .obj import Message, Req
+from .db import _DB
+from .obj import Message, Req, Community
 from .utils import Slots, clear
 from .dataclass import Msg, Embed, Res
 from .exceptions import (
@@ -37,16 +40,17 @@ from .exceptions import (
     InvalidDotenvKeys,
     CommandIsntAsync,
     InvalidChatChoice,
-    InvalidEvent
+    InvalidEvent,
+    InvalidRole
 )
 
 __all__ = ['Bot']
+with open(f'{Path(__file__).parent}/__init__.py') as f:
+    version = search(r'[0-9]+.[0-9]+.[0-9]+', f.read()).group()
 
 Coro_return_ws_msg = Callable[[], Coroutine[Msg, None, None]]
 Coro_return_Any    = Callable[[], Coroutine[Any, None, None]]
 Coro_return_None   = Callable[[], Coroutine[None, None, None]]
-
-version = '0.0.46'
 
 class Bot(Slots):
     """
@@ -102,11 +106,12 @@ class Bot(Slots):
         if only_chats and ignore_chats:
             raise InvalidChatChoice('Enter chats only in "only_chats" or "ignore_chats"')
 
-        self.id:    str               = 'ws.run'
-        self.sid:   str               = 'ws.run'
-        self._db:   DB                = DB()
-        self._msg:  Message           = Message()
-        self._loop: AbstractEventLoop = new_event_loop()
+        self.id:    str                             = 'ws.run'
+        self.sid:   str                             = 'ws.run'
+        self.staff: Dict[str, Dict[str, list[str]]] = {}
+        self._db:   _DB                             = _DB()
+        self._msg:  Message                         = Message()
+        self._loop: AbstractEventLoop               = new_event_loop()
         self.prefix = prefix
 
         self.only_chats   = only_chats
@@ -125,7 +130,8 @@ class Bot(Slots):
     def add(
         self,
         help:    str       = 'No help',
-        aliases: list[str] = []
+        aliases: list[str] = [],
+        staff:   Literal['any', 'curator', 'leader'] | None = None
     ) -> Callable[[Coro_return_ws_msg], None]:
         """
         Adds a command to the bot
@@ -142,10 +148,20 @@ class Bot(Slots):
         def foo(f: Coro_return_ws_msg) -> None:
             if not iscoroutinefunction(f):
                 raise CommandIsntAsync('Command must be async: "async def ..."')
+
+            if staff not in ['any', 'curator', 'leader', None]:
+                raise InvalidRole(
+                    f'{Fore.RED}{staff}{Fore.WHITE}. Choose between '
+                    f'{Fore.CYAN}any{Fore.WHITE}, '
+                    f'{Fore.CYAN}curator{Fore.WHITE}, '
+                    f'{Fore.CYAN}leader{Fore.WHITE}'
+                )
+
             self.commands[f.__name__] = {
                                     'aliases': aliases,
                                     'def': f,
-                                    'help': help
+                                    'help': help,
+                                    'staff': staff
                                 }
         return foo
 
@@ -308,19 +324,37 @@ class Bot(Slots):
             if name in args['aliases']:
                 return command_name
 
-    async def _call(self, m: Message) -> None:
+    async def _is_staff(self, m: Msg, role: Literal['any', 'curator', 'leader']) -> bool:
+        if m.com not in self.staff:
+            self.staff[m.com] = await Community.staff(m.com)
+
+        leaders  = [i['uid'] for i in self.staff[m.com]['leaders']]
+        curators = [i['uid'] for i in self.staff[m.com]['curators']]
+
+        if role == 'any':
+            return m.uid in leaders + curators
+        if role == 'leader':
+            return m.uid in leaders
+        if role == 'curator':
+            return m.uid in curators
+
+    async def _call(self, m: Msg) -> None:
         if m.text and m.text.startswith(self.prefix):
             splited      = m.text.split()
             name         = splited[0][len(self.prefix):]
             command_name = self._is_alias(name) or name
 
             if command_name in self.commands:
-                if (
-                    len(splited) > 1 
-                    and splited[1] in (f'{self.prefix}h', f'{self.prefix}help')
-                ):
-                    await self.send(self.commands[command_name]['help'])
-                else:
-                    # Remove command name from text
-                    m.text = ' '.join(splited[1:])
-                    self._loop.create_task(self.commands[command_name]['def'](m))
+                cmd          = self.commands[command_name]
+                staff        = cmd['staff']
+
+                if not staff or await self._is_staff(m, staff):
+                    if (
+                        len(splited) > 1 
+                        and splited[1] in (f'{self.prefix}h', f'{self.prefix}help')
+                    ):
+                        await self.send(cmd['help'])
+                    else:
+                        # Remove command name from text
+                        m.text = ' '.join(splited[1:])
+                        self._loop.create_task(cmd['def'](m))
