@@ -11,3 +11,4 @@ class AminoSays(Exception): pass
 class EmptyCom(Exception): pass
 class InvalidRole(Exception): pass
 class InvalidPythonVersion(Exception): pass
+class FontNotFound(Exception): pass
