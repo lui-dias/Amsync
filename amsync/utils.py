@@ -7,6 +7,7 @@ from subprocess import run
 from contextlib import suppress
 from unicodedata import normalize
 
+
 class MetaSlots(type):
     def __new__(cls, name, base, attrs):
         cls_slots      = [i for i in attrs['__slots__']]                                   if '__slots__' in attrs       else []
@@ -17,11 +18,7 @@ class MetaSlots(type):
         slots = [i for i in slots if i not in [i for i in attrs if not i.startswith('__')]]
 
         attrs['__slots__'] = slots
-        try:
-            return super().__new__(cls, name, base, attrs)
-        except ValueError:
-            print(attrs)
-            raise
+        return super().__new__(cls, name, base, attrs)
 
 
 class Slots(metaclass=MetaSlots):
