@@ -211,7 +211,7 @@ class DataUser(Slots):
             posts_count     = get_value(j, 'postsCount'),
             id              = get_value(j, 'uid'),
             reputation      = get_value(j, 'reputation'),
-            role            = {0: 'member', 101: 'curator', 100: 'leader', 102: 'leader-agent'}[j['role']],
+            role            = {0: 'member', 101: 'curator', 100: 'leader', 102: 'agent'}[j['role']],
             visitors_count  = get_value(j, 'visitoresCount')
         )
 
