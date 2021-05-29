@@ -43,7 +43,7 @@ def query():
         db.close()
 
 
-class DB:
+class _DB:
     def __init__(self):
         Account.create_table()
         Update.create_table()
@@ -90,3 +90,6 @@ class DB:
             if int(time()) - Update.get().up_deps_in >= _3_DAYS:
                 self.update_time_of('deps')
                 return True
+
+class DB:
+    pass
