@@ -28,13 +28,13 @@ async def any(m):
 \
 If the version is < 3.8, it shows an error similar to this one
 ```py
-InvalidPythonVersion(Your python 3.7, use python >= 3.8)
+InvalidPythonVersion: Your python 3.7, use python >= 3.8
 ```
 
 <br>
 <br>
 
 ### **[MakeImage.text] - Best error message if the text font doesn`t exist**
-```
+```py
 FontNotFound: Font 'lato-light.ttf' was not found in the current folder
 ```
