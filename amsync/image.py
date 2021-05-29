@@ -6,6 +6,8 @@ from typing import Tuple
 from pathlib import Path
 from filetype import guess_mime
 
+from .exceptions import FontNotFound
+
 
 __all__ = [
     'Color',
@@ -165,7 +167,7 @@ class MakeImage:
             if not font[0] or not font[1]:
                 raise Exception('No font-file or font-size')
             if not Path(font[0]).exists():
-                raise Exception(f"Font '{font[0]}' was not found in the current folder")
+                raise FontNotFound(f"Font '{font[0]}' was not found in the current folder")
             font = ImageFont.truetype(*font)
 
         w, h = self.get_text_pos(draw, text, font)
