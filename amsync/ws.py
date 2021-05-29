@@ -11,7 +11,7 @@ from colorama import Fore
 from pybase64 import urlsafe_b64decode
 
 from . import obj
-from .db import DB
+from .db import _DB
 from .obj import Message, _req
 from .enum import WsStatus
 from .utils import Slots, clear
@@ -34,7 +34,7 @@ class Ws(Slots):
     ):
         self._deviceid: str               = obj.headers['NDCDEVICEID']
         self._loop:     AbstractEventLoop = loop
-        self._db:       DB                = DB()
+        self._db:       _DB               = _DB()
         self.futures:   list[Future]      = []
         self._msg = Message()
 
