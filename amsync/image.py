@@ -152,18 +152,20 @@ class MakeImage:
     def text(
         self,
         text:         str,
-        position:     str | None   = None,
-        move:         Size         = (0, 0),
-        font:         str | None   = None,
-        color:        RGBA | Color = Color.WHITE,
-        stroke:       int          = 0,
-        stroke_color: RGBA | Color = Color.BLACK,
+        position:     str | None             = None,
+        move:         Size                   = (0, 0),
+        font:         Tuple[str, int] | None = None,
+        color:        RGBA | Color           = Color.WHITE,
+        stroke:       int                    = 0,
+        stroke_color: RGBA | Color           = Color.BLACK,
     ) -> None:
 
         draw = ImageDraw.Draw(self.img)
         if font:
             if not font[0] or not font[1]:
                 raise Exception('No font-file or font-size')
+            if not Path(font[0]).exists():
+                raise Exception(f"Font '{font[0]}' was not found in the current folder")
             font = ImageFont.truetype(*font)
 
         w, h = self.get_text_pos(draw, text, font)
@@ -206,7 +208,7 @@ class MakeImage:
         self.img.seek(n_frame)
         self.save('tmp.webp')
         with open('tmp.webp', 'rb') as tmp:
-            tmp = MakeImage.from_bytes(tmp.read())
+            tmp = MakeImage(tmp.read())
         Path('tmp.webp').unlink(missing_ok=True)
         return tmp
 
