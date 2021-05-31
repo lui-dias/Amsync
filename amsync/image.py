@@ -190,9 +190,15 @@ class MakeImage:
         if isinstance(im, MakeImage):
             im = im.img
             
-        self.img.paste(
-            im, self.calc(self.get_image_pos(im), position, move), im
-        )
+        try:
+            self.img.paste(
+                im, self.calc(self.get_image_pos(im), position, move), im.convert('RGBA')
+            )
+        except ValueError: # bad transparency mask
+            self.img.paste(
+                im, self.calc(self.get_image_pos(im), position, move)
+            )
+
 
     def circular_thumbnail(self) -> None:
         w, h = self.size
