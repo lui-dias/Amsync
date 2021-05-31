@@ -99,7 +99,7 @@ class Ws(Slots):
     def _call_events(
         self,
         name: str,
-        *m: list[Msg]
+        *m:   list[Msg]
     ) -> None:
         """
         Calls all events with the specific name
