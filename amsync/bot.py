@@ -5,6 +5,7 @@ from re import search
 from os import environ, execl
 
 from asyncio import (
+    gather,
     wait_for,
     new_event_loop,
     iscoroutinefunction,
@@ -31,8 +32,8 @@ from colorama import Fore, Style, init
 
 from .ws import Ws
 from .db import _DB
-from .obj import Message, Req, Community
-from .utils import Slots, clear
+from .obj import Message, Req, Community, _req, My, actual_com
+from .utils import Slots, clear, one_or_list, to_list
 from .dataclass import Msg, Embed, Res
 from .exceptions import (
     AccountNotFoundInDotenv,
@@ -257,6 +258,33 @@ class Bot(Slots):
             fut.result()
         except:
             raise fut.exception()
+
+    async def status(
+        self,
+        s:           Literal['on', 'off'],
+        com:         str | list[str] | None = None
+    ) -> Res | list[Res]:
+        """
+        Changes the status of the bot
+
+        'on' the bot goes online
+
+        'off' the bot goes offline
+
+        By default, the bot changes the status in all communities where it is
+
+        However you can insert the communities so it stays online or offline
+        """
+
+        assert s in ['on', 'off'], f"Choose 'on' or 'off', not {s}"
+
+        async def foo(i):
+            return await _req('post', f'x{i}/s/user-profile/{self.id}/online-status', data)
+
+        data = {'onlineStatus': 1} if s == 'on' else {'onlineStatus': 2, 'duration': 86400} # 1 day
+        com = to_list(com or [i for i in (await My.communities(False)).values()])
+
+        return one_or_list(await gather(*[foo(i) for i in com]))
 
     async def send(
         self,
