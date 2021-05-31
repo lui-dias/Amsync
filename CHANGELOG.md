@@ -1,18 +1,16 @@
 # 0.0.50
 
-## **FEAT**
+### **FEAT**
 <br>
 
-### **[Bot.status] - Changes the status of the bot**
+#### **[Bot.status] - Changes the status of the bot**
 ```py
-
 @bot.on()
 async def ready():
     await bot.status('on')
-
 ```
 
-The bot will take longer to start because it changes the status of all communities by default
+**NOTE:** The bot will take longer to start because it changes the status of all communities by default
 
 <br>
 <br>
@@ -21,13 +19,12 @@ The bot will take longer to start because it changes the status of all communiti
 
 # 0.0.47
 
-## **FEAT**
+### **FEAT**
 <br>
 
-### **[Bot.add] - Added option for a command to be called by curator(curator), leader(leader) or both(any)**
+#### **[Bot.add] - Added option for a command to be called by curator(curator), leader(leader) or both(any)**
 
 ```py
-
 @bot.add(staff='curator'):
 async def curator(m):
     await bot.send('A curator called me?')
@@ -39,7 +36,6 @@ async def leader(m):
 @bot.add(staff='any'):
 async def any(m):
     await bot.send('A leader or curator called me?')
-
 ```
 <br>
 <br>
