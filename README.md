@@ -25,8 +25,8 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def hello(m: Msg):
-    await bot.send(f'Hello {m.nickname}')
+async def hi(m: Msg):
+    await bot.send(f'Hi {m.nickname}')
 
 bot.run()
 ```
