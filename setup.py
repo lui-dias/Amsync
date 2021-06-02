@@ -38,7 +38,8 @@ setup(
         'python-dotenv',
         'pillow',
         'colorama',
-        'python-magic-bin'
+        'python-magic-bin',
+        'filetype'
     ],
     setup_requires=['wheel'],
     classifiers=[

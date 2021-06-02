@@ -6,3 +6,4 @@ python-dotenv
 pillow
 colorama
 python-magic-bin
+filetype
