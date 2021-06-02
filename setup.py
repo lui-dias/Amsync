@@ -6,12 +6,15 @@ with open('README.md', 'r') as stream:
     long_description = stream.read()
 
 with open(f'amsync/__init__.py') as f:
-    version = search(r'[0-9]+.[0-9]+.[0-9]+', f.read()).group()
+    cont = f.read()
+    prod_version = search(r'p[0-9]+.[0-9]+.[0-9]+', cont).group()[1:]
+    test_version = search(r't[0-9]+.[0-9]+.[0-9]+', cont).group()[1:]
+
 
 
 setup(
     name='Amsync',
-    version=version,
+    version=prod_version,
     url='https://github.com/ellandor/Amsync',
     license='MIT',
     author='SempreLegit',
