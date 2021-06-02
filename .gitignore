@@ -1,5 +1,7 @@
 .vscode/
 *.bat
+prod-up.py
+test-up.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
