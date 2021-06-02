@@ -86,7 +86,7 @@ def init():
         with open('bot.py', 'w') as f:
             f.write(
 """
-from amsync import Bot, Message
+from amsync import Bot, Msg
 
 bot = Bot()
 
@@ -95,8 +95,8 @@ async def ready():
     print('Ready')
 
 @bot.add()
-async def hello(m: Message):
-    await bot.send(f'Hello {m.nickname}')
+async def hi(m: Msg):
+    await bot.send(f'Hi {m.nickname}')
 
 bot.run()
 
