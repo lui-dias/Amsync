@@ -162,17 +162,23 @@ class ChatMsg(Slots):
         )
 
 
-@dataclass
 class Embed(Slots):
     """
     Represents the Embed that will be sent in Message.send
     """
-
-    msg_text: str
-    title:    str
-    text:     str
-    link:     str
-    image:    str | bytes = None
+    def __init__(
+        self,
+        msg_text: str,
+        title:    str,
+        text:     str,
+        link:     str,
+        image:    str | bytes = None
+    ):
+        self.msg_text = msg_text
+        self.title    = title
+        self.text     = text
+        self.link     = link
+        self.image    = image
 
 
 @dataclass
