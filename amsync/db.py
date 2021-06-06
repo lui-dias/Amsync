@@ -16,7 +16,7 @@ _3_DAYS = 259200
 
 class Account(Model):
     email = CharField()
-    sid = CharField(192)
+    sid = CharField()
     change_in = IntegerField()
 
     class Meta:
