@@ -3,6 +3,7 @@ from __future__ import annotations
 from re import search
 from typing import AsyncIterator, Literal
 from asyncio import AbstractEventLoop, Future, sleep
+from binascii import Error
 from contextlib import suppress
 
 from ujson import loads
@@ -108,16 +109,6 @@ class Ws(Slots):
         for i in self._events[name]:
             self._loop.create_task(i(*m))
 
-    def _fix_sid(self, sid: str) -> str:
-        """
-        Fix the size of the sid
-        """
-
-        # Sometimes sid can be an invalid base64,
-        # causing a padding error in urlsafe_b64decode
-        # Add = until sid has the len of 192 or len % 4 == 0 solve the problem
-        return sid + '=' * (192 - len(sid))
-
     def _can_call(self, msg: Msg) -> Literal[True] | None:
         if not self._only_chats and not self._ignore_chats:
             return True
@@ -149,13 +140,18 @@ class Ws(Slots):
         """
     
         if not self._db.get_account(self._email):
-            self._db.add_account(self._email, self._fix_sid(await self._get_sid()))
+            self._db.add_account(self._email, await self._get_sid())
 
         sid = self._db.get_account(self._email)
 
         obj.headers['NDCAUTH'] = f'sid={sid}'
-        self._decoded = urlsafe_b64decode(sid).decode('cp437')
-        id_ = search(r'\w{8}-\w{4}-\w{4}-\w{4}-\w{12}', self._decoded,).group()
+        while True:
+            try:
+                decoded = urlsafe_b64decode(sid).decode('cp437')
+                break
+            except Error:
+                sid = sid[:-1]
+        id_ = search(r'\w{8}-\w{4}-\w{4}-\w{4}-\w{12}', decoded).group()
 
         bot.sid = sid
         bot.id = id_
