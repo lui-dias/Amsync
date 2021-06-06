@@ -32,7 +32,7 @@ from colorama import Fore, Style, init
 
 from .ws import Ws
 from .db import _DB
-from .obj import Message, Req, Community, _req, My, actual_com
+from .obj import Message, Req, Community, _req, My
 from .utils import Slots, clear, one_or_list, to_list
 from .dataclass import Msg, Embed, Res
 from .exceptions import (
@@ -47,7 +47,7 @@ from .exceptions import (
 
 __all__ = ['Bot']
 with open(f'{Path(__file__).parent}/__init__.py') as f:
-    version = search(r'[0-9]+.[0-9]+.[0-9]+', f.read()).group()
+    version = search(r'p[0-9]+.[0-9]+.[0-9]+', f.read()).group()[1:]
 
 Coro_return_ws_msg = Callable[[], Coroutine[Msg, None, None]]
 Coro_return_Any    = Callable[[], Coroutine[Any, None, None]]
@@ -113,8 +113,8 @@ class Bot(Slots):
         self._db:   _DB                             = _DB()
         self._msg:  Message                         = Message()
         self._loop: AbstractEventLoop               = new_event_loop()
-        self.prefix = prefix
 
+        self.prefix       = prefix
         self.only_chats   = only_chats
         self.ignore_chats = ignore_chats
 
@@ -225,6 +225,7 @@ class Bot(Slots):
                     try_update()
                     clear()
                     print('Restarting...\n')
+                    Path('db.db').unlink(missing_ok=True)
                     execl(sys.executable, Path(__file__).absolute(), *sys.argv)
                 clear()
 
@@ -234,7 +235,7 @@ class Bot(Slots):
         """
 
         self._loop.run_until_complete(self.check_update())
-        self._ws: Ws = Ws(
+        self._ws = Ws(
             loop         = self._loop,
             email        = self._email,
             password     = self._password,
@@ -317,7 +318,7 @@ class Bot(Slots):
     async def wait_for(
         self,
         check:   Callable[[Msg], bool] = lambda _: True,
-        timeout: int | None              = None
+        timeout: int | None            = None
     ) -> Awaitable[Future, int | None] | None:
         """
         Wait for a message until the check is met or timeout finish
