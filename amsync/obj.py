@@ -402,8 +402,8 @@ class File:
 
 class Chat:
     async def search(
-        com:  str | None = None,
-        chat: str | None = None
+        chat: str | None = None,
+        com:  str | None = None
     ) -> DataChat:
         """
         Search for chat information
@@ -476,7 +476,7 @@ class Chat:
         return messages[start:end]
 
     async def clear(
-        msgs:  str | list[str] | None = None,
+        msgs:  str | list[str] | None    = None,
         check: Callable[[ChatMsg], bool] = lambda _: True,
         com:   str | None = None,
         chat:  str | None = None,
@@ -650,8 +650,8 @@ class Chat:
         return await _req('post', f'x{com or actual_com}/s/chat/thread', data=data)
 
     async def delete(
-        com:  str | None = None,
-        chat: str | None = None
+        chat: str | None = None,
+        com:  str | None = None
     ) -> Res:
         """
         Delete a chat
@@ -783,7 +783,7 @@ class Chat:
         with open(filename or f'{n}.json', 'w') as f:
             dump(info, f, indent=4, escape_forward_slashes=False)
 
-    async def load(filename: str) -> None:
+    async def load(filename: str) -> str:
         """
         Creates a chat containing the .json information created by Chat.save
 
@@ -804,9 +804,10 @@ class Chat:
             invite_members = f['members']
         )
 
-        chats = list((await Community.chats()).values())[0]
-        names = [i.name for i in chats]
-        ids   = [i.id for i in chats]
+        chats = await Community.chats()
+        names = [i['name'] for i in chats]
+        ids   = [i['id'] for i in chats]
+        chat  = ids[names.index(tmp_chat_name)]
 
         await Chat.edit(
             name               = f['name'],
@@ -816,10 +817,11 @@ class Chat:
             members_can_invite = f['members_can_invite'],
             can_send_coins     = f['can_send_coins'],
             change_adm_to      = f['adm'] if f['adm'] != bot_id else None,
-            chat               = ids[names.index(tmp_chat_name)]
+            chat               = chat
         )
 
         await Chat.change_co_hosts(f['co_hosts'])
+        return chat
 
 class Community:
     async def chats(
@@ -866,7 +868,7 @@ class Community:
                     a = max_name - len(name)
                     print(f"    {name} {' '*a}-> {n['id']}")
                 print()
-        return chats
+        return [j for i in chats.values() for j in i]
 
     async def staff(com=None) -> Dict[list[Dict[str, str]]]:
         """
@@ -883,7 +885,7 @@ class Community:
 
 class My:
     async def chats(
-        need_print:   bool = True,
+        need_print:   bool = False,
         ignore_ascii: bool = False
     ) -> dict[str, list[str, list[str]]]:
         """
@@ -935,10 +937,10 @@ class My:
                     print(f'    {j[0]} {" "*a}-> {j[1]}')
                 print()
 
-        return coms
+        return [j for i in list(coms.values()) for j in i[1]]
 
     async def communities(
-        need_print:   bool = True,
+        need_print:   bool = False,
         ignore_ascii: bool = False
     ) -> dict[str, str]:
         """
