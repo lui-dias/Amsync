@@ -41,7 +41,6 @@ setup(
         'python-dotenv',
         'pillow',
         'colorama',
-        'python-magic-bin',
         'filetype'
     ],
     setup_requires=['wheel'],
