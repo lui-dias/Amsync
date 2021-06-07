@@ -7,10 +7,10 @@ from .dataclass import *
 from .exceptions import InvalidPythonVersion
 
 # Production
-__version__ = 'p0.0.52'
+__version__ = 'p0.0.53'
 
 # Test
-__version__ = 't0.0.54'
+__version__ = 't0.0.55'
 
 
 if sys.version_info < (3, 8):
