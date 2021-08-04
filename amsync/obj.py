@@ -52,7 +52,7 @@ __all__ = [
 ignore_codes = [
     1628 # Sorry, you cannot pick this member.. | Chat.config
 ]
-headers: dict[str, str] = {'NDCDEVICEID': '0184a516841ba77a5b4648de2cd0dfcb30ea46dbb4e911a6ed122578b14c7b662c59f9a2c83101f5a1'}
+headers: dict[str, str] = {'NDCDEVICEID': '22B705239F40C2D378ED366C8250FE9A2365477F438E473EA6486475D189FF84440BDBCB837214A601'}
 actual_com:  str | None = None
 actual_chat: str | None = None
 bot_id:      str | None = None
